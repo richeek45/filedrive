@@ -4,15 +4,24 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 type User struct {
-	ID          string    `json:"id"`
-	Email       string    `json:"email"`
-	Name        string    `json:"name"`
-	Picture     string    `json:"picture"`
-	GoogleID    string    `json:"google_id"`
-	CreatedAt   time.Time `json:"created_at"`
+	// gorm.Model includes ID, CreatedAt, UpdatedAt, DeletedAt
+	gorm.Model
+
+	// uniqueIndex:name creates a composite unique index on both fields
+	FirstName string `gorm:"uniqueIndex:idx_full_name;not null" json:"first_name" binding:"required"`
+	LastName  string `gorm:"uniqueIndex:idx_full_name;not null" json:"last_name" binding:"required"`
+	Picture   string `gorm:"type:text" json:"picture" binding:"omitempty,url"`
+	Email     string `gorm:"uniqueIndex;not null" json:"email" binding:"required,email"`
+	Country   string `gorm:"not null;default:'Unknown'" json:"country"`
+
+	// Use a check constraint to ensure age is realistic
+	Age int `gorm:"not null;check:age >= 0 AND age < 100" json:"age"`
+
+	GoogleID    string    `gorm:"uniqueIndex" json:"google_id"`
 	LastLoginAt time.Time `json:"last_login_at"`
 }
 
