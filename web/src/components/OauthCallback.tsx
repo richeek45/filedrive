@@ -7,12 +7,12 @@ const OAuthCallback = () => {
 
   useEffect(() => {
     const handleCallback = async () => {
-    // Check if we already have tokens (from first run)
-    const hasTokens = !!localStorage.getItem('access_token');
+    const hasValidTokens = !!localStorage.getItem('access_token');
+    const tokenExpiryTime = localStorage.getItem('token_expiry');
+    const hasTokenExpired = tokenExpiryTime && (Date.now() > parseInt(tokenExpiryTime as string, 10) * 1000)
     
-    if (!hasTokens) {
+    if (!hasValidTokens || hasTokenExpired) {
       const success = authService.handleCallback();
-      console.log(success, "success");
       
       if (success) {
         navigate('/dashboard', { replace: true });

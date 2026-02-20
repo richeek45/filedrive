@@ -39,3 +39,13 @@ default.nix
 Dockerfile.dev
 
 .env
+*.json
+client_ext.cnf
+client.csr
+client.key
+client.pem
+rootCA.key
+rootCA.pem
+rootCA.srl
+
+notes.md

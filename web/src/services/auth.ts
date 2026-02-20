@@ -15,12 +15,10 @@ interface FetchOptions extends RequestInit {
 
 class AuthService {
   private readonly API_URL: string;
-  private processed: boolean;
   private refreshPromise: Promise<string> | null = null;
 
   constructor() {
     this.API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
-    this.processed = false;
   }
 
   getApiUrl() {
@@ -34,10 +32,6 @@ class AuthService {
 
   // Handle OAuth callback
   public handleCallback(): boolean {
-    console.log("processed")
-    if (this.processed) return true;
-
-    console.log("not processed")
 
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get('access_token');
@@ -50,7 +44,6 @@ class AuthService {
         refresh_token: refreshToken, 
         expires_in: expiresIn 
       });
-      this.processed = true;
       return true;
     }
     
@@ -214,10 +207,6 @@ class AuthService {
     return response as unknown as T;
   }
 
-  // Clear processed flag (useful for testing)
-  public resetProcessed(): void {
-    this.processed = false;
-  }
 }
 
 // Export singleton instance
