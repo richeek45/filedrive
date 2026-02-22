@@ -11,7 +11,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - app-network
     healthcheck:
@@ -23,7 +22,7 @@ services:
   backend:
     build:
       context: .  # Build from current root directory
-      dockerfile: Dockerfile.backend
+      dockerfile: Dockerfile.dev # Dockerfile.backend for prod
     container_name: go_backend
     ports:
       - "8000:8000"
@@ -33,6 +32,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      SSL_MODE: disable
       AWS_REGION: ${AWS_REGION}
       S3_BUCKET: ${S3_BUCKET}
       AWS_OIDC_AUDIENCE: ${AWS_OIDC_AUDIENCE}
@@ -43,6 +43,7 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL}
+      JWT_SECRET: ${JWT_SECRET}
       GOOGLE_APPLICATION_CREDENTIALS: /app/sa.json # for local
     depends_on:
       postgres:
@@ -53,7 +54,7 @@ services:
     # For development with hot-reload (optional)
     volumes:
       - ./gcp-service-account.json:/app/sa.json # for local
-      # - ./:/app  # Mount entire root for development
+      - ./:/app  # Mount entire root for development
       - /app/tmp  # Exclude temp folder if using air for hot-reload
 
   frontend:

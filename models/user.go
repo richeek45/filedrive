@@ -19,7 +19,13 @@ type User struct {
 	Country   string `gorm:"not null;default:'Unknown'" json:"country"`
 
 	// Use a check constraint to ensure age is realistic
-	Age int `gorm:"not null;check:age >= 0 AND age < 100" json:"age"`
+	Age int `gorm:"not null;check:age >= 0 AND age < 150" json:"age"`
+
+	Files   []File   `gorm:"foreignKey:OwnerID"`
+	Folders []Folder `gorm:"foreignKey:OwnerID"`
+
+	Permissions        []ResourcePermission `gorm:"foreignKey:UserID"`
+	GrantedPermissions []ResourcePermission `gorm:"foreignKey:GrantedBy"`
 
 	GoogleID    string    `gorm:"uniqueIndex" json:"google_id"`
 	LastLoginAt time.Time `json:"last_login_at"`
