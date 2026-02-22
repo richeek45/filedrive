@@ -77,7 +77,6 @@ func (r *AuthController) GoogleCallback(c *gin.Context) {
 	}
 
 	// Map Google info to our Struct
-	// Note: We don't manually set ID or CreatedAt because gorm.Model handles it
 	user := &models.User{
 		GoogleID:    userInfo["id"].(string),
 		Email:       userInfo["email"].(string),

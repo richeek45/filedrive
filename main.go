@@ -68,6 +68,10 @@ func main() {
 	userController := &controllers.UserController{Repo: userRepo}
 	routes.RegisteredUserRoutes(api, userController)
 
+	folderRepo := repositories.NewFolderRepository(db)
+	folderController := &controllers.FolderController{Repo: folderRepo}
+	routes.FolderRoutes(api, folderController)
+
 	authController := controllers.NewAuthController(userRepo)
 	routes.AuthRoutes(api, authController)
 
