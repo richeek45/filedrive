@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const fetchUserProfile = async (): Promise<void> => {
     try {
       const response = await authService.fetchWithAuth(
-        `${authService.getApiUrl()}/profile`
+        `${authService.getApiUrl()}/users/profile`
       );
 
       console.log(response);
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setUser(userData);
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
-      authService.logout();
+      // authService.logout();
     } finally {
       setLoading(false);
     }

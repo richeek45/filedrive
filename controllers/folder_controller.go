@@ -68,6 +68,7 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 		}
 
 		c.JSON(http.StatusOK, folders)
+		return
 	}
 
 	// If parentId present → fetch children

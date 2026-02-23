@@ -11,7 +11,7 @@ type Folder struct {
 	Name string    `gorm:"type:varchar(255);not null"`
 
 	OwnerID uuid.UUID `gorm:"type:uuid;not null"`
-	Owner   User      `gorm:"foreignKey:OwnerID;constraint:OnDelete:CASCADE;"`
+	Owner   *User      `gorm:"foreignKey:OwnerID;constraint:OnDelete:CASCADE;"`
 
 	// Self reference
 	ParentID *uuid.UUID `gorm:"type:uuid;index"`

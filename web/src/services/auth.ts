@@ -6,7 +6,7 @@ interface Tokens {
 
 interface AuthHeaders {
   Authorization: string;
-  'Content-Type': string;
+  "Content-Type": string;
 }
 
 interface FetchOptions extends RequestInit {
@@ -18,11 +18,11 @@ class AuthService {
   private refreshPromise: Promise<string> | null = null;
 
   constructor() {
-    this.API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+    this.API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
   }
 
   getApiUrl() {
-    return this.API_URL
+    return this.API_URL;
   }
 
   // Initiate Google login
@@ -32,21 +32,20 @@ class AuthService {
 
   // Handle OAuth callback
   public handleCallback(): boolean {
-
     const params = new URLSearchParams(window.location.search);
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    const expiresIn = params.get('expires_in');
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
+    const expiresIn = params.get("expires_in");
 
     if (accessToken && refreshToken && expiresIn) {
-      this.setTokens({ 
-        access_token: accessToken, 
-        refresh_token: refreshToken, 
-        expires_in: expiresIn 
+      this.setTokens({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_in: expiresIn,
       });
       return true;
     }
-    
+
     return false;
   }
 
@@ -54,27 +53,27 @@ class AuthService {
   private setTokens(tokens: Tokens): void {
     console.log("setting tokens", tokens);
     try {
-      localStorage.setItem('access_token', tokens.access_token);
-      localStorage.setItem('refresh_token', tokens.refresh_token);
-      localStorage.setItem('token_expiry', tokens.expires_in.toString());
+      localStorage.setItem("access_token", tokens.access_token);
+      localStorage.setItem("refresh_token", tokens.refresh_token);
+      localStorage.setItem("token_expiry", tokens.expires_in.toString());
     } catch (error) {
-      console.error('Failed to store tokens:', error);
+      console.error("Failed to store tokens:", error);
     }
   }
 
   public getAccessToken(): string | null {
-    return localStorage.getItem('access_token');
+    return localStorage.getItem("access_token");
   }
 
   public getRefreshToken(): string | null {
-    return localStorage.getItem('refresh_token');
+    return localStorage.getItem("refresh_token");
   }
 
   // Check if token is expired
   public isTokenExpired(): boolean {
-    const expiry = localStorage.getItem('token_expiry');
+    const expiry = localStorage.getItem("token_expiry");
     if (!expiry) return true;
-    
+
     const expiryTime = parseInt(expiry, 10) * 1000;
     // Add a small buffer (5 seconds) to prevent edge cases
     return Date.now() + 5000 > expiryTime;
@@ -90,15 +89,15 @@ class AuthService {
     const refreshToken = this.getRefreshToken();
     if (!refreshToken) {
       this.logout();
-      throw new Error('No refresh token available');
+      throw new Error("No refresh token available");
     }
 
     this.refreshPromise = (async () => {
       try {
         const response = await fetch(`${this.API_URL}/auth/refresh`, {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             refresh_token: refreshToken,
@@ -107,7 +106,7 @@ class AuthService {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to refresh token');
+          throw new Error(errorData.message || "Failed to refresh token");
         }
 
         const tokens: Tokens = await response.json();
@@ -124,56 +123,53 @@ class AuthService {
     return this.refreshPromise;
   }
 
-  // Logout
   public logout(): void {
     // Clear local storage
     try {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('token_expiry');
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("token_expiry");
     } catch (error) {
-      console.error('Failed to clear storage:', error);
+      console.error("Failed to clear storage:", error);
     }
 
     // Call logout endpoint (optional) - don't await
     fetch(`${this.API_URL}/auth/logout`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     }).catch(() => {
       // Silently fail - logout already happened client-side
     });
 
     // Redirect to login
-    window.location.href = '/login';
+    window.location.href = "/login";
   }
 
-  // Get auth headers for API calls
   public getAuthHeaders(): AuthHeaders {
     const token = this.getAccessToken();
     return {
-      'Authorization': `Bearer ${token || ''}`,
-      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token || ""}`,
+      "Content-Type": "application/json",
     };
   }
 
-  // Check if user is authenticated
   public isAuthenticated(): boolean {
     return !!this.getAccessToken() && !this.isTokenExpired();
   }
 
   // Make authenticated API call with automatic token refresh
   public async fetchWithAuth<T = Response>(
-    url: string, 
-    options: FetchOptions = {}
+    url: string,
+    options: FetchOptions = {},
   ): Promise<T> {
     // Check if token is expired and refresh if needed
     if (this.isTokenExpired()) {
       try {
         await this.refreshToken();
       } catch (error) {
-        throw new Error('Session expired. Please login again.');
+        throw new Error("Session expired. Please login again.");
       }
     }
 
@@ -189,7 +185,7 @@ class AuthService {
     if (response.status === 401) {
       try {
         await this.refreshToken();
-        
+
         // Retry the request with new token
         response = await fetch(url, {
           ...options,
@@ -200,13 +196,12 @@ class AuthService {
         });
       } catch (error) {
         this.logout();
-        throw new Error('Authentication failed. Please login again.');
+        throw new Error("Authentication failed. Please login again.");
       }
     }
 
     return response as unknown as T;
   }
-
 }
 
 // Export singleton instance
