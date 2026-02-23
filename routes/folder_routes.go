@@ -7,7 +7,7 @@ import (
 )
 
 func FolderRoutes(api *gin.RouterGroup, folderController *controllers.FolderController) {
-	folderApi := api.Group("/folder")
+	folderApi := api.Group("/folders")
 	folderApi.Use(middleware.AuthMiddleware())
 
 	{

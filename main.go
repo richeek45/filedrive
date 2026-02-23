@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -54,6 +55,13 @@ func main() {
 
 	router := gin.Default()
 
+	router.RedirectTrailingSlash = false
+	router.RedirectFixedPath = false
+
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "pong"})
+	})
+
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
@@ -74,6 +82,10 @@ func main() {
 
 	authController := controllers.NewAuthController(userRepo)
 	routes.AuthRoutes(api, authController)
+
+	for _, route := range router.Routes() {
+		fmt.Printf("Method: %s | Path: %s\n", route.Method, route.Path)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {

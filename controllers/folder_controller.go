@@ -30,7 +30,11 @@ func (fc *FolderController) CreateFolder(c *gin.Context) {
 		return
 	}
 
-	userID := userRaw.(uuid.UUID)
+	userID, err := uuid.Parse(userRaw.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot parse UUID"})
+		return
+	}
 	folder, err := fc.Repo.CreateFolder(userID, req.Name, req.ParentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -48,7 +52,11 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 		return
 	}
 
-	userID := userRaw.(uuid.UUID)
+	userID, err := uuid.Parse(userRaw.(string))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot parse UUID"})
+		return
+	}
 	parentIDParam := c.Query("parentId")
 
 	// If no parentId → root folders

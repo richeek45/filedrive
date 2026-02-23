@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
 )
@@ -36,19 +37,27 @@ func (r *UserController) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": user})
 }
 
-func (r *UserController) GetByID(id interface{}) (*models.User, error) {
+func (r *UserController) GetByID(id uuid.UUID) (*models.User, error) {
 	var user models.User
-	err := r.Repo.DB.First(&user, id).Error
+	err := r.Repo.DB.First(&user, "id = ?", id).Error
 	return &user, err
 }
 
 func (r *UserController) GetProfile(c *gin.Context) {
-	userID, exists := c.Get("userID")
+	userRaw, exists := c.Get("userID")
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := r.GetByID(userID)
+
+	userStr := userRaw.(string)
+	parsedID, err := uuid.Parse(userStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID format in token. Please re-login."})
+		return
+	}
+
+	user, err := r.GetByID(parsedID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found in database"})
 		return

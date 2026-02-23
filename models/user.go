@@ -4,12 +4,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type User struct {
-	// gorm.Model includes ID, CreatedAt, UpdatedAt, DeletedAt
-	gorm.Model
+	ID uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 
 	// uniqueIndex:name creates a composite unique index on both fields
 	FirstName string `gorm:"uniqueIndex:idx_full_name;not null" json:"first_name" binding:"required"`
@@ -29,6 +29,15 @@ type User struct {
 
 	GoogleID    string    `gorm:"uniqueIndex" json:"google_id"`
 	LastLoginAt time.Time `json:"last_login_at"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time `gorm:"index"`
+}
+
+func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+	u.ID = uuid.New()
+	return
 }
 
 type TokenDetails struct {

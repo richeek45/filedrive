@@ -11,7 +11,7 @@ func RegisteredUserRoutes(api *gin.RouterGroup, userController *controllers.User
 	protected := api.Group("/users")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.GET("/me", userController.GetProfile)
+		protected.GET("/profile", userController.GetProfile)
 		protected.POST("/", userController.CreateUser)
 		//  protected.GET("/health", healthCheck)
 		// protected.POST("/upload", uploadFile(s3Client))

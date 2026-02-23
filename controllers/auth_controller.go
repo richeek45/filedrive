@@ -122,14 +122,14 @@ func (r *AuthController) getUserInfo(accessToken string) (map[string]interface{}
 func (r *AuthController) generateTokens(user *models.User) (*models.TokenDetails, error) {
 	accessTokenExpiry := time.Now().Add(time.Hour * 1) // 1 hour
 	accessClaims := &models.Claims{
-		UserID: strconv.FormatUint(uint64(user.ID), 10),
+		UserID: user.ID.String(),
 		Email:  user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(accessTokenExpiry),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "your-app",
-			Subject:   strconv.FormatUint(uint64(user.ID), 10),
+			Subject:   user.ID.String(),
 		},
 	}
 
@@ -141,14 +141,14 @@ func (r *AuthController) generateTokens(user *models.User) (*models.TokenDetails
 
 	refreshTokenExpiry := time.Now().Add(time.Hour * 24 * 7) // 7 days
 	refreshClaims := &models.Claims{
-		UserID: strconv.FormatUint(uint64(user.ID), 10),
+		UserID: user.ID.String(),
 		Email:  user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(refreshTokenExpiry),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "your-app",
-			Subject:   strconv.FormatUint(uint64(user.ID), 10),
+			Subject:   user.ID.String(),
 		},
 	}
 
