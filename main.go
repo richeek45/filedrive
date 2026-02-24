@@ -12,6 +12,7 @@ import (
 	"github.com/richeek45/filedrive/db"
 	"github.com/richeek45/filedrive/repositories"
 	"github.com/richeek45/filedrive/routes"
+	"github.com/richeek45/filedrive/storage"
 )
 
 func loadEnv() {
@@ -37,6 +38,9 @@ func loadEnv() {
 func main() {
 	loadEnv()
 	db := db.InitDB()
+
+	s3Client := storage.InitS3()
+	bucketName := os.Getenv("S3_BUCKET")
 
 	env := os.Getenv("GO_ENV")
 	if env == "" {
@@ -77,8 +81,20 @@ func main() {
 	routes.RegisteredUserRoutes(api, userController)
 
 	folderRepo := repositories.NewFolderRepository(db)
-	folderController := &controllers.FolderController{Repo: folderRepo}
+	folderController := &controllers.FolderController{
+		Repo: folderRepo,
+		S3Client: s3Client,
+        Bucket:   bucketName,
+	}
 	routes.FolderRoutes(api, folderController)
+
+	fileRepo := repositories.NewFileRepository(db)
+	fileController := &controllers.FileController{ 
+		Repo: fileRepo,
+		S3Client: s3Client,
+		Bucket: bucketName,
+	}
+	routes.FileRoutes(api, fileController)
 
 	authController := controllers.NewAuthController(userRepo)
 	routes.AuthRoutes(api, authController)

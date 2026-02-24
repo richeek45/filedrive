@@ -3,6 +3,7 @@ package controllers
 import (
 	"net/http"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/richeek45/filedrive/repositories"
@@ -10,6 +11,8 @@ import (
 
 type FolderController struct {
 	Repo *repositories.FolderRepostory
+	S3Client *s3.Client
+    Bucket   string
 }
 
 func (fc *FolderController) CreateFolder(c *gin.Context) {
