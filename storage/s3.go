@@ -2,18 +2,18 @@ package storage
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"google.golang.org/api/idtoken"
 )
 
-func InitS3() {
+func InitS3() *s3.Client {
 	ctx := context.Background()
 
 	// Testing to find the authorization type, need to be type = "service-account"
@@ -62,29 +62,23 @@ func InitS3() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Assumed role successfully:", *out.AssumedRoleUser.Arn)
+	// fmt.Println("Assumed role successfully:", *out.AssumedRoleUser.Arn)
 
-	s3Client := s3.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+        // Use the credentials from the AssumeRole output
+        o.Credentials = aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(
+            *out.Credentials.AccessKeyId,
+            *out.Credentials.SecretAccessKey,
+            *out.Credentials.SessionToken,
+        ))
+    })
 
-	result, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println(result)
-
-	// bucket := "filedrive-bucket"
-	// key := "test.txt"
-	// content := "Hello from Roles Anywhere!"
-
-	// _, err = s3Client.PutObject(ctx, &s3.PutObjectInput{
-	// 	Bucket: &bucket,
-	// 	Key:    &key,
-	// 	Body:   strings.NewReader(content),
-	// })
+	// 	result, err := s3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
 	// if err != nil {
-	// 	log.Fatalf("failed to upload: %v", err)
+	// 	log.Fatal(err)
 	// }
 
-	// fmt.Println("File uploaded successfully!")
+	// fmt.Println("result = ", *result.Buckets[0].Name, *result.Buckets[1].Name)
+
+    return s3Client
 }

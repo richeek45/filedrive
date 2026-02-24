@@ -14,8 +14,6 @@ func RegisteredUserRoutes(api *gin.RouterGroup, userController *controllers.User
 		protected.GET("/profile", userController.GetProfile)
 		protected.POST("/", userController.CreateUser)
 		//  protected.GET("/health", healthCheck)
-		// protected.POST("/upload", uploadFile(s3Client))
-		// protected.GET("/files", getFiles(db))
 		// protected.PUT("/me", userController.UpdateProfile) // /api/users/me
 		// protected.DELETE("/me", userController.DeleteAccount)
 

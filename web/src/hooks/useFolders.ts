@@ -1,6 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchFolders, createFolderApi } from "../services/folder.service";
+import {
+  fetchFolders,
+  createFolderApi,
+  fetchFiles,
+} from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
+import { uploadFileInParts } from "../lib/upload";
 
 export const useFolders = (parentId: string | null = null) => {
   const queryClient = useQueryClient();
@@ -9,6 +14,11 @@ export const useFolders = (parentId: string | null = null) => {
     // Important: Key must include parentId so TanStack treats each folder level as a unique cache
     queryKey: ["folders", parentId],
     queryFn: () => fetchFolders(parentId),
+  });
+
+  const filesQuery = useQuery({
+    queryKey: ["files", parentId],
+    queryFn: () => fetchFiles(parentId),
   });
 
   const createFolderMutation = useMutation({
@@ -20,9 +30,10 @@ export const useFolders = (parentId: string | null = null) => {
 
     // Optional: Optimistic update
     onMutate: async (newFolder) => {
-      await queryClient.cancelQueries({ queryKey: ["folders"] });
+      const queryKey = ["folders", parentId];
+      await queryClient.cancelQueries({ queryKey });
 
-      const previousFolders = queryClient.getQueryData<Folder[]>(["folders"]);
+      const previousFolders = queryClient.getQueryData<Folder[]>(queryKey);
 
       if (previousFolders) {
         queryClient.setQueryData<Folder[]>(
@@ -51,15 +62,28 @@ export const useFolders = (parentId: string | null = null) => {
 
     onError: (_, __, context) => {
       if (context?.previousFolders) {
-        queryClient.setQueryData(["folders"], context.previousFolders);
+        queryClient.setQueryData(
+          ["folders", parentId],
+          context.previousFolders,
+        );
       }
+    },
+  });
+
+  const uploadFileMutation = useMutation({
+    mutationFn: (file: File) => uploadFileInParts(file, parentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["folders", parentId] });
     },
   });
 
   return {
     folders: foldersQuery.data ?? [],
+    files: filesQuery.data ?? [],
     isLoading: foldersQuery.isLoading,
     createFolder: createFolderMutation.mutate,
+    uploadFile: uploadFileMutation.mutateAsync, // mutateAsync is better for loops
+    isUploading: uploadFileMutation.isPending,
     isCreating: createFolderMutation.isPending,
   };
 };
