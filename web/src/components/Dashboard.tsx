@@ -2,6 +2,14 @@ import React, { useState } from "react";
 import Sidebar from "./Sidebar";
 import { useFolders } from "../hooks/useFolders";
 import { NewFolderModal } from "./FolderModal";
+import {
+  MoreVertical,
+  Play,
+  Download,
+  Trash,
+  Share,
+  Edit2,
+} from "lucide-react";
 
 interface FileItem {
   id: string;
@@ -60,7 +68,29 @@ export const FolderItem = ({
   );
 };
 
-export const FileItem = ({ file }: { file: any }) => {
+// Helper Components
+const MenuOption = ({ icon, label, onClick, danger = false }: any) => (
+  <button
+    onClick={onClick}
+    className={`w-full flex items-center gap-3 px-4 py-2 text-sm transition-colors ${
+      danger ? "text-red-600 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50"
+    }`}
+  >
+    {icon} {label}
+  </button>
+);
+
+export const FileItem = ({
+  file,
+  downloadFile,
+  moveToTrash,
+}: {
+  file: any;
+  downloadFile: (fileId: string) => void;
+  moveToTrash: (fileId: string) => void;
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const isPaused = file.uploadStatus === "paused";
   const isUploading =
     file.uploadStatus === "pending" || file.uploadStatus === "uploading";
 
@@ -69,24 +99,33 @@ export const FileItem = ({ file }: { file: any }) => {
       ? Math.round((file.uploadedChunks / file.totalChunks) * 100)
       : 0;
 
+  //  const handleResume = async (fileData: any) => {
+  //   // 1. Get the actual File object from a local map or input state
+  //   const localFile = getLocalFile(file.id);
+
+  //   // 2. Determine which parts are missing
+  //   const totalParts = fileData.totalChunks;
+  //   const uploadedParts = fileData.uploadedPartNumbers; // e.g., [1, 2, 4]
+
+  //   for (let i = 1; i <= totalParts; i++) {
+  //     if (!uploadedParts.includes(i)) {
+  //       // 3. Call your existing "presign-part" and upload logic for part 'i'
+  //       await uploadChunk(fileData.id, localFile, i);
+  //     }
+  //   }
+  // };
+
   return (
-    <div className="group flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer">
-      <div className="flex items-center justify-center w-12 h-12 bg-gray-50 rounded-lg text-2xl group-hover:bg-blue-50 transition-colors">
+    <div className="relative group flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 transition-all">
+      {/* Icon Section */}
+      <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+        {/* <FileIcon mime={file.mimeType} /> */}
         {getFileIcon(file.mimeType)}
       </div>
 
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold text-gray-900 truncate">
-            {file.name}
-          </p>
-          {isUploading && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium animate-pulse">
-              {progress}%
-            </span>
-          )}
-        </div>
-
+        <p className="text-sm font-semibold truncate">{file.name}</p>
+        {/* <p className="text-xs text-gray-500">{file.uploadStatus}</p> */}
         <div className="flex items-center gap-2 mt-1">
           <p className="text-xs text-gray-500">{formatSize(file.size)}</p>
           <span className="text-gray-300">•</span>
@@ -104,6 +143,70 @@ export const FileItem = ({ file }: { file: any }) => {
             ></div>
           </div>
         )}
+        {isUploading && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium animate-pulse">
+            {progress}%
+          </span>
+        )}
+      </div>
+
+      {/* Action Area */}
+      <div className="flex items-center gap-2">
+        {/* Resume Button - Only shows if Paused */}
+        {isPaused && (
+          <button
+            onClick={() => {
+              /* Trigger your upload resume logic */
+            }}
+            className="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+            title="Resume Upload"
+          >
+            <Play size={14} fill="currentColor" />
+          </button>
+        )}
+
+        {/* Menu Toggle */}
+        <div className="relative">
+          <button
+            onClick={() => setShowMenu(!showMenu)}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+          >
+            <MoreVertical size={20} />
+          </button>
+
+          {showMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setShowMenu(false)}
+              />
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-lg shadow-xl z-20 py-1 overflow-hidden">
+                <MenuOption
+                  icon={<Download size={16} />}
+                  label="Download"
+                  onClick={() => downloadFile(file.id)}
+                />
+                <MenuOption
+                  icon={<Edit2 size={16} />}
+                  label="Rename"
+                  onClick={() => {}}
+                />
+                <MenuOption
+                  icon={<Share size={16} />}
+                  label="Share"
+                  onClick={() => {}}
+                />
+                <hr className="my-1 border-gray-50" />
+                <MenuOption
+                  icon={<Trash size={16} />}
+                  label="Move to Trash"
+                  danger
+                  onClick={() => moveToTrash(file.id)}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -113,8 +216,16 @@ const Dashboard: React.FC = () => {
   const [currentParentId, setCurrentParentId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const { folders, files, createFolder, uploadFile, isCreating, isLoading } =
-    useFolders(currentParentId);
+  const {
+    folders,
+    files,
+    downloadFile,
+    moveToTrash,
+    createFolder,
+    uploadFile,
+    isCreating,
+    isLoading,
+  } = useFolders(currentParentId);
 
   console.log({ folders, files });
 
@@ -133,6 +244,7 @@ const Dashboard: React.FC = () => {
     const fileArray = Array.from(files);
 
     // Using mutateAsync in a loop allows you to await each sequential upload
+    // Find a way to fire multiple file uploads simultaneously
     for (const file of fileArray) {
       try {
         console.log("Initiating upload");
@@ -173,7 +285,12 @@ const Dashboard: React.FC = () => {
           />
         ))}
         {files.map((item) => (
-          <FileItem key={item.ID} file={item} />
+          <FileItem
+            key={item.ID}
+            file={item}
+            downloadFile={downloadFile}
+            moveToTrash={moveToTrash}
+          />
         ))}
       </div>
     );
