@@ -61,6 +61,24 @@ export const fetchFiles = async (
   return res.data;
 };
 
+export const syncPendingFileUploads = async () => {
+  const { data } = await api.get("files/sync-active-uploads");
+  return data;
+};
+
+export const downloadFileApi = async (fileId: string) => {
+  const res = await api.get(`/files/${fileId}/download`);
+  return res.data;
+};
+
+export const renameFileApi = async (fileId: string, name: string) => {
+  const res = await api.patch(`/files/${fileId}/rename`, { name });
+  return res.data;
+};
+
+export const moveToTrashApi = (fileId: string) =>
+  api.patch(`/files/${fileId}/trash`);
+
 export const createFolderApi = async (payload: {
   name: string;
   parentId?: string | null;

@@ -3,6 +3,10 @@ import {
   fetchFolders,
   createFolderApi,
   fetchFiles,
+  downloadFileApi,
+  moveToTrashApi,
+  renameFileApi,
+  syncPendingFileUploads,
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
@@ -16,9 +20,38 @@ export const useFolders = (parentId: string | null = null) => {
     queryFn: () => fetchFolders(parentId),
   });
 
+  const syncQuery = useQuery({
+    queryKey: ["files", "sync"],
+    queryFn: async () => await syncPendingFileUploads(),
+    staleTime: 60000,
+    refetchOnWindowFocus: true,
+  });
+
   const filesQuery = useQuery({
     queryKey: ["files", parentId],
     queryFn: () => fetchFiles(parentId),
+    enabled: syncQuery.isSuccess || syncQuery.isError,
+  });
+
+  const downloadFile = useMutation({
+    mutationFn: async (fileId: string) => {
+      const data = await downloadFileApi(fileId);
+      window.open(data.url, "_blank");
+    },
+    onSuccess: () => console.log("downloaded file successfully"),
+  });
+
+  const renameFile = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      renameFileApi(id, name),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["files", parentId] }),
+  });
+
+  const moveToTrash = useMutation({
+    mutationFn: (fileId: string) => moveToTrashApi(fileId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["files", parentId] }),
   });
 
   const createFolderMutation = useMutation({
@@ -80,9 +113,13 @@ export const useFolders = (parentId: string | null = null) => {
   return {
     folders: foldersQuery.data ?? [],
     files: filesQuery.data ?? [],
+    moveToTrash: moveToTrash.mutate,
+    downloadFile: downloadFile.mutate,
+    renameFile: renameFile.mutate,
     isLoading: foldersQuery.isLoading,
     createFolder: createFolderMutation.mutate,
     uploadFile: uploadFileMutation.mutateAsync, // mutateAsync is better for loops
+    isSyncing: syncQuery.isPending,
     isUploading: uploadFileMutation.isPending,
     isCreating: createFolderMutation.isPending,
   };

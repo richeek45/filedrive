@@ -3,6 +3,8 @@ package controllers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -46,6 +48,77 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, files)
+}
+
+func (fc *FileController) GetDownloadURL(c *gin.Context) {
+    fileID := c.Param("id")
+    userID := c.GetString("userID")
+
+    file, err := fc.Repo.GetFileByID(uuid.MustParse(fileID), uuid.MustParse(userID))
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+        return
+    }
+
+	// 1. URL-encode the filename to handle spaces and special characters
+    // PathEscape is better here than QueryEscape as it handles spaces as %20
+    encodedName := url.PathEscape(file.Name)
+
+    // 2. Use the RFC 6266 format: filename*=UTF-8''{encoded_name}
+    contentDisposition := fmt.Sprintf("attachment; filename*=UTF-8''%s", encodedName)
+
+    // 2. Create Presigned URL (Valid for 15 minutes)
+    presignClient := s3.NewPresignClient(fc.S3Client)
+    presignedReq, err := presignClient.PresignGetObject(c.Request.Context(), &s3.GetObjectInput{
+        Bucket:                     aws.String(fc.Bucket),
+        Key:                        aws.String(file.ObjectKey),
+        ResponseContentDisposition: aws.String(contentDisposition),
+    })
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate URL"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"url": presignedReq.URL})
+}
+
+func (fc *FileController) MoveToTrash(c *gin.Context) {
+	fileId, err := uuid.Parse(c.Param("fileId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId := uuid.MustParse(c.GetString("userID"))
+	if err := fc.Repo.SoftDeleteFile(fileId, userId); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete file"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "File moved to trash"})
+}
+
+func (fc *FileController) RenameFile(c *gin.Context) {
+    var req struct {
+        NewName string `json:"name" binding:"required"`
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+    fileID := uuid.MustParse(c.Param("id"))
+    userID := uuid.MustParse(c.GetString("userID"))
+
+    err := fc.Repo.DB.Model(&models.File{}).
+        Where("id = ? AND owner_id = ?", fileID, userID).
+        Update("name", req.NewName).Error
+
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
+        return
+    }
+    c.JSON(http.StatusOK, gin.H{"message": "Renamed successfully"})
 }
 
 func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
@@ -173,7 +246,6 @@ func (fc *FileController) CompleteMultipartUpload(c *gin.Context) {
         return
     }
 
-    // 1. Tell S3 to finalize
     result, err := fc.S3Client.CompleteMultipartUpload(c.Request.Context(), &s3.CompleteMultipartUploadInput{
         Bucket:   aws.String(fc.Bucket),
         Key:      aws.String(req.Key),
@@ -202,3 +274,38 @@ func (fc *FileController) CompleteMultipartUpload(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"message": "upload completed successfully"})
 }
 
+// Syncs the files on opening my files tab to check and update the upload status of pending S3 multipart uploads
+func (fc *FileController) SyncUserUploads(c *gin.Context) {
+	userID := uuid.MustParse(c.GetString("userID"))
+
+    var pendingFiles []models.File
+    // Only sync files that aren't 'completed' or 'error'
+    fc.Repo.DB.Where("owner_id = ? AND upload_status IN ?", userID, []string{"pending", "uploading", "paused"}).Find(&pendingFiles)
+
+    for _, file := range pendingFiles {
+		fmt.Println(file.Name, " = Name")
+        if file.S3UploadID == nil || time.Since(file.UpdatedAt) < 5 * time.Minute { continue }
+
+        out, err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
+            Bucket:   aws.String(file.BucketName),
+            Key:      aws.String(file.ObjectKey),
+            UploadId: file.S3UploadID,
+        })
+
+		fmt.Println("S3 Uploads = ", *out.PartNumberMarker, out.Parts)
+
+        if err != nil {
+            // If S3 doesn't find the upload, it might have expired
+            fc.Repo.DB.Model(&file).Update("upload_status", "paused")
+            continue
+        }
+
+        // Update DB with what S3 actually has
+        fc.Repo.DB.Model(&file).Updates(map[string]interface{}{
+            "uploaded_chunks": len(out.Parts),
+            "upload_status":   "paused", // It's "paused" because the client isn't currently pushing
+        })
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "Sync complete"})
+}
