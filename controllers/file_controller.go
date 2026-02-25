@@ -1,14 +1,15 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/richeek45/filedrive/models"
@@ -20,10 +21,6 @@ type FileController struct {
     S3Client *s3.Client
     Bucket   string
 }
-
-// func (fc *FileController) getPresigner() *s3.PresignClient {
-//     return s3.NewPresignClient(fc.S3Client)
-// }
 
 func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	var req struct {
@@ -139,29 +136,36 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 
 	// 1. Check DB for existing upload for this User + FileName + ParentID
     var pending models.PendingUpload
-    err := fc.Repo.DB.Where("user_id = ? AND file_name = ? AND parent_id = ?", 
-        userID, req.FileName, req.ParentID).First(&pending).Error
+    query := fc.Repo.DB.Where("user_id = ? AND file_name = ?", userID, req.FileName)
+    if req.ParentID == nil {
+        query = query.Where("parent_id IS NULL")
+    } else {
+        query = query.Where("parent_id = ?", req.ParentID)
+    }
+    err := query.First(&pending).Error
 
-    if err != nil {
+    if err == nil {
         // Found existing! Ask S3 which parts it already has
-        out, _ := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
+        out, S3err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
             Bucket:   aws.String(fc.Bucket),
             Key:      aws.String(pending.S3Key),
             UploadId: aws.String(pending.UploadID),
         })
 
-		fmt.Println("Parts = ", out.Parts);
-
-        c.JSON(http.StatusOK, gin.H{
-            "uploadId":      pending.UploadID,
-            "key":           pending.S3Key,
-            "completedParts": out.Parts, // Frontend skips these
-            "resumed":       true,
-        })
-        return
+        if S3err != nil {
+            // If S3 says it doesn't exist (maybe expired), delete pending and start fresh
+            fc.Repo.DB.Delete(&pending)
+        } else {
+            // Return parts with ETags so frontend can "Complete" later
+            c.JSON(http.StatusOK, gin.H{
+                "uploadId":      pending.UploadID,
+                "key":           pending.S3Key,
+                "completedParts": out.Parts, // This includes PartNumber and ETag
+                "resumed":       true,
+            })
+            return
+        }
     }
-
-	fmt.Println("Uploading to:", fc.Bucket)
 
     key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)
 	
@@ -193,7 +197,17 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 		TotalChunks: req.TotalChunks,
     }
 
-    if err := fc.Repo.UpsertFilePending(newFile); err != nil {
+    pendingEntry := &models.PendingUpload{
+        ID:         uuid.New(),
+        UserID:     userID,
+        UploadID:   *resp.UploadId,
+        S3Key:      key,
+        FileName:   req.FileName,
+        ParentID:   req.ParentID,
+        TotalParts: *req.TotalChunks,
+    }
+
+    if err := fc.Repo.UpsertFilePending(newFile, pendingEntry); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
         return
     }
@@ -283,8 +297,9 @@ func (fc *FileController) SyncUserUploads(c *gin.Context) {
     fc.Repo.DB.Where("owner_id = ? AND upload_status IN ?", userID, []string{"pending", "uploading", "paused"}).Find(&pendingFiles)
 
     for _, file := range pendingFiles {
-		fmt.Println(file.Name, " = Name")
-        if file.S3UploadID == nil || time.Since(file.UpdatedAt) < 5 * time.Minute { continue }
+        fmt.Println(file.Name)
+        if file.S3UploadID == nil { continue }
+        // if file.S3UploadID == nil || time.Since(file.UpdatedAt) < 5 * time.Minute { continue }
 
         out, err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
             Bucket:   aws.String(file.BucketName),
@@ -292,18 +307,29 @@ func (fc *FileController) SyncUserUploads(c *gin.Context) {
             UploadId: file.S3UploadID,
         })
 
-		fmt.Println("S3 Uploads = ", *out.PartNumberMarker, out.Parts)
-
         if err != nil {
-            // If S3 doesn't find the upload, it might have expired
-            fc.Repo.DB.Model(&file).Update("upload_status", "paused")
-            continue
-        }
+			var apiErr smithy.APIError
+			// Check if the error is specifically because the upload no longer exists in S3
+			if errors.As(err, &apiErr) {
+				switch apiErr.ErrorCode() {
+				case "NoSuchUpload":
+					// S3 Lifecycle rule likely deleted the parts. Reset the DB record.
+					fc.Repo.DB.Model(&file).Updates(map[string]interface{}{
+						"s3_upload_id":          nil,
+						"uploaded_chunks":       0,
+						"uploaded_part_numbers": 0,
+						"upload_status":         "paused",
+					})
+					continue
+				}
+			}
+			continue
+		}
 
         // Update DB with what S3 actually has
         fc.Repo.DB.Model(&file).Updates(map[string]interface{}{
             "uploaded_chunks": len(out.Parts),
-            "upload_status":   "paused", // It's "paused" because the client isn't currently pushing
+            "upload_status":   "paused",
         })
     }
 

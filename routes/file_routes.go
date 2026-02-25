@@ -12,12 +12,12 @@ func FileRoutes(api *gin.RouterGroup, fileController *controllers.FileController
 	fileApi.Use(middleware.AuthMiddleware())
 	{
 		fileApi.GET("/", fileController.GetFilesFromParentFolder)
-		fileApi.GET("/:id/download", fileController.GetDownloadURL)
-		fileApi.PATCH("/:id/trash", fileController.MoveToTrash) // Add this for soft delete
+		fileApi.GET("/:fileId/download", fileController.GetDownloadURL)
+		fileApi.PATCH("/:fileId/trash", fileController.MoveToTrash) // Add this for soft delete
 		fileApi.GET("/sync-active-uploads", fileController.SyncUserUploads)
 	}
 
-	uploadApi := api.Group("/upload")
+	uploadApi := fileApi.Group("/uploads")
 	{
 		// Multipart Upload Routes
 		uploadApi.POST("/initiate", fileController.InitiateMultiPartUpload)

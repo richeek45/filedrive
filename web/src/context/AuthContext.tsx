@@ -1,8 +1,8 @@
-import { createContext, useState, useContext, useEffect } from 'react';
-import type { ReactNode} from 'react';
-import authService from '../services/auth';
+import { createContext, useState, useContext, useEffect } from "react";
+import type { ReactNode } from "react";
+import authService from "../services/auth";
 
-interface User {
+export interface User {
   id: string;
   email: string;
   name?: string;
@@ -39,19 +39,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const fetchUserProfile = async (): Promise<void> => {
     try {
       const response = await authService.fetchWithAuth(
-        `${authService.getApiUrl()}/users/profile`
+        `${authService.getApiUrl()}/users/profile`,
       );
 
       console.log(response);
-      
+
       if (!response.ok) {
-        throw new Error('Failed to fetch user profile');
+        throw new Error("Failed to fetch user profile");
       }
-      
+
       const userData: User = await response.json();
       setUser(userData);
     } catch (error) {
-      console.error('Failed to fetch user profile:', error);
+      console.error("Failed to fetch user profile:", error);
       // authService.logout();
     } finally {
       setLoading(false);
@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 export const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

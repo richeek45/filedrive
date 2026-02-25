@@ -9,8 +9,6 @@ export const uploadFileInParts = async (
   parentId: string | null,
 ) => {
   try {
-    // 1. Initiate
-    console.log("intiating from the uploadFileInParts function");
     const totalParts = Math.ceil(file.size / CHUNK_SIZE);
 
     const { data: initData } = await api.post("/files/uploads/initiate", {
@@ -21,14 +19,10 @@ export const uploadFileInParts = async (
       totalChunks: totalParts,
     });
 
-    const { uploadId, key } = initData;
-
-    // Create a queue of part numbers
-    // const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
-    const completedParts: { PartNumber: number; ETag: string }[] = [];
+    const { uploadId, key, completedParts = [], resumed } = initData;
 
     const finishedNumbers = new Set(
-      completedParts.map((p: any) => p.PartNumber),
+      completedParts.map((p: any) => p.PartNumber || p.partNumber),
     );
     const queue = Array.from({ length: totalParts }, (_, i) => i + 1).filter(
       (num) => !finishedNumbers.has(num),
@@ -46,7 +40,6 @@ export const uploadFileInParts = async (
         const end = Math.min(start + CHUNK_SIZE, file.size);
         const blob = file.slice(start, end);
 
-        // A. Get Presigned URL from Go
         const { data: urlData } = await api.post(
           "/files/uploads/presign-part",
           {
@@ -56,7 +49,6 @@ export const uploadFileInParts = async (
           },
         );
 
-        // B. PUT to S3
         const uploadResponse = await fetch(urlData.url, {
           method: "PUT",
           body: blob,
@@ -66,7 +58,7 @@ export const uploadFileInParts = async (
 
         const etag =
           uploadResponse.headers.get("ETag")?.replace(/"/g, "") || "";
-        completedParts.push({ PartNumber: partNumber, ETag: etag });
+        allCompletedParts.push({ PartNumber: partNumber, ETag: etag });
       } catch (err) {
         if (attempt < MAX_RETRIES) {
           console.warn(
@@ -91,14 +83,12 @@ export const uploadFileInParts = async (
     // Fire off workers based on CONCURRENCY_LIMIT
     await Promise.all(Array.from({ length: CONCURRENCY_LIMIT }, worker));
 
-    // 3. Finalize
-    completedParts.sort((a, b) => a.PartNumber - b.PartNumber);
+    allCompletedParts.sort((a, b) => a.PartNumber - b.PartNumber);
     await api.post("/files/uploads/complete", {
       uploadId,
       key,
-      parts: completedParts,
+      parts: allCompletedParts,
       parentId,
-      // add parts
     });
 
     return true;

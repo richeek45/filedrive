@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -29,8 +28,7 @@ type File struct {
 	UploadStatus   string        `gorm:"type:varchar(20);default:'pending'" json:"uploadStatus"`
 	TotalChunks    *int          `json:"totalChunks"`
 	UploadedChunks int           `gorm:"default:0" json:"uploadedChunks"`
-	UploadedPartNumbers pq.Int64Array `gorm:"type:int[]" json:"uploadedPartNumbers"`
-
+	UploadedPartNumbers int `gorm:"column:uploaded_part_numbers" json:"uploadedPartNumbers"`
 	IsDeleted bool `gorm:"default:false" json:"isDeleted"`
 
 	Folder *Folder `gorm:"foreignKey:FolderID;references:ID;constraint:OnDelete:CASCADE;" json:"-"`

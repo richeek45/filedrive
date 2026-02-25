@@ -5,6 +5,7 @@ export interface File {
   ID: string;
   Name: string;
   OwnerID: string;
+  FolderID: string;
   Size: number;
   MimeType: string;
   // S3 metadata
@@ -16,7 +17,7 @@ export interface File {
   UploadStatus: string;
   TotalChunks: number;
   UploadedChunks: number;
-  UploadedPartNumbers: number[];
+  UploadedPartNumbers: number;
 
   IsDeleted: boolean;
   // Folder *Folder `gorm:"foreignKey:FolderID;references:ID;constraint:OnDelete:CASCADE;" json:"-"`

@@ -53,13 +53,23 @@ func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID) ([]mode
 	return files, err
 }
 
-func (r *FileRepository) UpsertFilePending(file *models.File) error {
+func (r *FileRepository) UpsertFilePending(file *models.File, pendingEntry *models.PendingUpload) error {
 	// We use Upsert (On Conflict) so if the user resumes an upload,
 	// we just update the existing record based on ObjectKey or ID
-	return r.DB.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "object_key"}},
-		DoUpdates: clause.AssignmentColumns([]string{"updated_at", "s3_upload_id"}),
-	}).Create(file).Error
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+        err := tx.Clauses(clause.OnConflict{
+            Columns:   []clause.Column{{Name: "object_key"}},
+            DoUpdates: clause.AssignmentColumns([]string{"updated_at", "s3_upload_id", "upload_status"}),
+        }).Create(file).Error
+        if err != nil {
+            return err
+        }
+
+        return tx.Clauses(clause.OnConflict{
+            Columns:   []clause.Column{{Name: "s3_key"}}, // Or "upload_id" depending on your constraint
+            DoUpdates: clause.AssignmentColumns([]string{"upload_id", "updated_at"}),
+        }).Create(pendingEntry).Error
+    })
 }
 
 func (r *FileRepository) FinalizeFile(uploadID string, partsCount int, finalETag string, status string) error {
