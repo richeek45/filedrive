@@ -10,6 +10,7 @@ import {
   Share,
   Edit2,
 } from "lucide-react";
+import { useUploadManager } from "../lib/uploadManager";
 
 interface FileItem {
   id: string;
@@ -18,7 +19,6 @@ interface FileItem {
   modifiedAt: Date;
 }
 
-// Helper to format bytes into KB, MB, GB
 const formatSize = (bytes: number) => {
   if (bytes === 0) return "0 Bytes";
   const k = 1024;
@@ -27,7 +27,6 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 };
 
-// Simple icon mapper based on MimeType
 const getFileIcon = (mimeType: string | null) => {
   if (!mimeType) return "📄";
   if (mimeType.includes("image")) return "🖼️";
@@ -68,7 +67,6 @@ export const FolderItem = ({
   );
 };
 
-// Helper Components
 const MenuOption = ({ icon, label, onClick, danger = false }: any) => (
   <button
     onClick={onClick}
@@ -84,10 +82,12 @@ export const FileItem = ({
   file,
   downloadFile,
   moveToTrash,
+  uploadFile,
 }: {
   file: any;
   downloadFile: (fileId: string) => void;
   moveToTrash: (fileId: string) => void;
+  uploadFile: (file: File) => void;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const isPaused = file.uploadStatus === "paused";
@@ -99,27 +99,45 @@ export const FileItem = ({
       ? Math.round((file.uploadedChunks / file.totalChunks) * 100)
       : 0;
 
-  //  const handleResume = async (fileData: any) => {
-  //   // 1. Get the actual File object from a local map or input state
-  //   const localFile = getLocalFile(file.id);
+  const { getPersistentFile, registerFileHandle } = useUploadManager();
 
-  //   // 2. Determine which parts are missing
-  //   const totalParts = fileData.totalChunks;
-  //   const uploadedParts = fileData.uploadedPartNumbers; // e.g., [1, 2, 4]
+  const handleResume = async (fileData: any) => {
+    // Try to get the file from IndexedDB first
+    let file = await getPersistentFile(fileData.id);
 
-  //   for (let i = 1; i <= totalParts; i++) {
-  //     if (!uploadedParts.includes(i)) {
-  //       // 3. Call your existing "presign-part" and upload logic for part 'i'
-  //       await uploadChunk(fileData.id, localFile, i);
-  //     }
-  //   }
-  // };
+    console.log({ ...file, type: fileData.mimeType }, "file");
+
+    // Fallback: If handle is missing, ask user to re-select
+    if (!file) {
+      const [handle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [
+          { description: "Original File", accept: { [fileData.mimeType]: [] } },
+        ],
+      });
+
+      file = await handle.getFile();
+
+      // Check if it's the right file by name/size
+      if (file.name !== fileData.name) {
+        alert("Please select the original file: " + fileData.name);
+        return;
+      }
+
+      // Re-save handle for next time
+      await registerFileHandle(fileData.id, handle, fileData.mimeType);
+    }
+    if (file) {
+      await uploadFile(
+        new File([file], file.name, { type: fileData.mimeType }) as File,
+      );
+    }
+  };
 
   return (
     <div className="relative group flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-blue-400 transition-all">
       {/* Icon Section */}
       <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-        {/* <FileIcon mime={file.mimeType} /> */}
         {getFileIcon(file.mimeType)}
       </div>
 
@@ -152,11 +170,10 @@ export const FileItem = ({
 
       {/* Action Area */}
       <div className="flex items-center gap-2">
-        {/* Resume Button - Only shows if Paused */}
         {isPaused && (
           <button
             onClick={() => {
-              /* Trigger your upload resume logic */
+              handleResume(file);
             }}
             className="p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
             title="Resume Upload"
@@ -290,6 +307,7 @@ const Dashboard: React.FC = () => {
             file={item}
             downloadFile={downloadFile}
             moveToTrash={moveToTrash}
+            uploadFile={uploadFile}
           />
         ))}
       </div>

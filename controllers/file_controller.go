@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
+	"gorm.io/gorm"
 )
 
 type FileController struct {
@@ -165,7 +166,10 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
             })
             return
         }
-    }
+    } else if !errors.Is(err, gorm.ErrRecordNotFound) {
+    c.JSON(http.StatusNotFound, gin.H{ "error": err.Error()})
+    return;
+}
 
     key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)
 	
