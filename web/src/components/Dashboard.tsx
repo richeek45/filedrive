@@ -242,6 +242,7 @@ const Dashboard: React.FC = () => {
     uploadFile,
     isCreating,
     isLoading,
+    activeUploads,
   } = useFolders(currentParentId);
 
   console.log({ folders, files });
@@ -309,6 +310,20 @@ const Dashboard: React.FC = () => {
             moveToTrash={moveToTrash}
             uploadFile={uploadFile}
           />
+        ))}
+        {Object.entries(activeUploads).map(([fileName, progress]) => (
+          <div key={fileName} className="p-2 border rounded mb-2 bg-blue-50">
+            <div className="flex justify-between text-sm mb-1">
+              <span>{fileName}</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 h-2 rounded overflow-hidden">
+              <div
+                className="bg-blue-600 h-full transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
         ))}
       </div>
     );

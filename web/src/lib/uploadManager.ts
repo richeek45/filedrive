@@ -1,4 +1,4 @@
-import { get, set, del } from "idb-keyval";
+import { get, set } from "idb-keyval";
 
 export const useUploadManager = () => {
   const registerFileHandle = async (

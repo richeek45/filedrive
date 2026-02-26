@@ -12,6 +12,7 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/richeek45/filedrive/dtos"
 	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
 	"gorm.io/gorm"
@@ -45,7 +46,19 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, files)
+    var response []dtos.FileResponse
+
+    for _, f := range files {
+        response = append(response, dtos.FileResponse{
+            ID:        f.ID,
+            Name:      f.Name,
+            Size:      f.Size,
+            MimeType:  f.MimeType,
+            CreatedAt: f.CreatedAt,
+        })
+    }
+
+    c.JSON(http.StatusOK, response)
 }
 
 func (fc *FileController) GetDownloadURL(c *gin.Context) {
@@ -133,6 +146,8 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 		return
 	}
 
+    // validate the file size and throw the error -> max file size = 1 GB
+
 	userID := uuid.MustParse(c.GetString("userID"))
 
 	// 1. Check DB for existing upload for this User + FileName + ParentID
@@ -167,8 +182,7 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
             return
         }
     } else if !errors.Is(err, gorm.ErrRecordNotFound) {
-    c.JSON(http.StatusNotFound, gin.H{ "error": err.Error()})
-    return;
+    fmt.Println("response not found")
 }
 
     key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)

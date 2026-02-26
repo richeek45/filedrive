@@ -7,6 +7,7 @@ const MAX_RETRIES = 3;
 export const uploadFileInParts = async (
   file: File,
   parentId: string | null,
+  onProgress: (percent: number) => void,
 ) => {
   try {
     const totalParts = Math.ceil(file.size / CHUNK_SIZE);
@@ -30,6 +31,7 @@ export const uploadFileInParts = async (
 
     const allCompletedParts = [...completedParts];
 
+    let completedCount = finishedNumbers.size;
     // Helper: Upload a single part with retry logic
     const uploadPartWithRetry = async (
       partNumber: number,
@@ -55,6 +57,10 @@ export const uploadFileInParts = async (
         });
 
         if (!uploadResponse.ok) throw new Error("S3 Upload Failed");
+
+        completedCount++;
+        const percent = Math.round((completedCount / totalParts) * 100);
+        onProgress(percent);
 
         const etag =
           uploadResponse.headers.get("ETag")?.replace(/"/g, "") || "";

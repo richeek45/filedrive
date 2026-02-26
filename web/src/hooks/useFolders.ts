@@ -10,8 +10,10 @@ import {
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
+import { useState } from "react";
 
 export const useFolders = (parentId: string | null = null) => {
+  const [uploads, setUploads] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
   const foldersQuery = useQuery({
@@ -104,9 +106,20 @@ export const useFolders = (parentId: string | null = null) => {
   });
 
   const uploadFileMutation = useMutation({
-    mutationFn: (file: File) => uploadFileInParts(file, parentId),
-    onSuccess: () => {
+    mutationFn: (file: File) =>
+      uploadFileInParts(file, parentId, (percent) => {
+        console.log("percentage = ", percent);
+        setUploads((prev) => ({ ...prev, [file.name]: percent }));
+      }),
+    onSuccess: (_, file) => {
+      setUploads((prev) => {
+        const newUploads = { ...prev };
+        delete newUploads[file.name];
+        return newUploads;
+      });
+      queryClient.invalidateQueries({ queryKey: ["files", parentId] });
       queryClient.invalidateQueries({ queryKey: ["folders", parentId] });
+      queryClient.invalidateQueries({ queryKey: ["files", "sync"] });
     },
   });
 
@@ -119,6 +132,7 @@ export const useFolders = (parentId: string | null = null) => {
     isLoading: foldersQuery.isLoading,
     createFolder: createFolderMutation.mutate,
     uploadFile: uploadFileMutation.mutateAsync, // mutateAsync is better for loops
+    activeUploads: uploads,
     isSyncing: syncQuery.isPending,
     isUploading: uploadFileMutation.isPending,
     isCreating: createFolderMutation.isPending,
