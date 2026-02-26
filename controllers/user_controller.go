@@ -24,7 +24,7 @@ func (r *UserController) FindUsers(c *gin.Context) {
 }
 
 func (r *UserController) CreateUser(c *gin.Context) {
-	var user models.User
+	var user models.Users
 	if err := c.ShouldBindJSON(&user); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -37,8 +37,8 @@ func (r *UserController) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": user})
 }
 
-func (r *UserController) GetByID(id uuid.UUID) (*models.User, error) {
-	var user models.User
+func (r *UserController) GetByID(id uuid.UUID) (*models.Users, error) {
+	var user models.Users
 	err := r.Repo.DB.First(&user, "id = ?", id).Error
 	return &user, err
 }
@@ -68,5 +68,7 @@ func (r *UserController) GetProfile(c *gin.Context) {
 		"Email":   user.Email,
 		"Name":    user.FirstName,
 		"Picture": user.Picture,
+		"StorageUsed": user.StorageUsed,
+		"StorageLimit": user.StorageLimit,
 	})
 }

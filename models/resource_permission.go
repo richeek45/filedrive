@@ -31,11 +31,11 @@ type ResourcePermission struct {
 	FolderID *uuid.UUID `gorm:"type:uuid;index"`
 
 	GrantedBy     uuid.UUID `gorm:"type:uuid;not null"`
-	GrantedByUser User      `gorm:"foreignKey:GrantedBy"`
+	GrantedByUser Users      `gorm:"foreignKey:GrantedBy"`
 
 	// user with the access permission
 	UserID uuid.UUID `gorm:"type:uuid;not null;index"`
-	User   User      `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
+	User   Users      `gorm:"foreignKey:UserID;references:ID;constraint:OnDelete:CASCADE"`
 
 	Permission PermissionType `gorm:"type:permission_type;not null;default:'viewer'"`
 

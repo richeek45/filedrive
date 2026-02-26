@@ -13,6 +13,8 @@ import (
 	"github.com/richeek45/filedrive/repositories"
 	"github.com/richeek45/filedrive/routes"
 	"github.com/richeek45/filedrive/storage"
+	"github.com/richeek45/filedrive/worker"
+	"github.com/robfig/cron/v3"
 )
 
 func loadEnv() {
@@ -46,6 +48,19 @@ func main() {
 	if env == "" {
 		env = "development"
 	}
+
+	cronJob := cron.New(cron.WithSeconds())
+	cronJob.AddFunc("0 0 0 * * *", func() {
+		log.Println("--- Starting Storage Sync Job ---")
+
+		err := worker.SyncUserStorage(db)
+
+		if err != nil {
+			log.Printf("Storage Sync failed %v", err)
+		}
+	})
+
+	cronJob.Start()
 
 	var allowedOrigins []string
 	if env == "production" {

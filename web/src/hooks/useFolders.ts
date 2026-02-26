@@ -11,6 +11,7 @@ import {
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
 import { useState } from "react";
+import { api } from "../lib/api";
 
 export const useFolders = (parentId: string | null = null) => {
   const [uploads, setUploads] = useState<Record<string, number>>({});

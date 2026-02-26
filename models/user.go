@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type User struct {
+type Users struct {
 	ID uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 
 	// uniqueIndex:name creates a composite unique index on both fields
@@ -20,6 +20,9 @@ type User struct {
 
 	// Use a check constraint to ensure age is realistic
 	Age int `gorm:"not null;check:age >= 0 AND age < 150" json:"age"`
+
+    StorageUsed  int64 `gorm:"default:0" json:"storage_used"`
+    StorageLimit int64 `gorm:"default:1073741824" json:"storage_limit"` // 1GB default
 
 	Files   []File   `gorm:"foreignKey:OwnerID"`
 	Folders []Folder `gorm:"foreignKey:OwnerID"`
@@ -35,7 +38,7 @@ type User struct {
 	DeletedAt *time.Time `gorm:"index"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
+func (u *Users) BeforeCreate(tx *gorm.DB) (err error) {
 	u.ID = uuid.New()
 	return
 }

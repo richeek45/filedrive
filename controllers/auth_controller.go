@@ -77,7 +77,7 @@ func (r *AuthController) GoogleCallback(c *gin.Context) {
 	}
 
 	// Map Google info to our Struct
-	user := &models.User{
+	user := &models.Users{
 		GoogleID:    userInfo["id"].(string),
 		Email:       userInfo["email"].(string),
 		FirstName:   userInfo["given_name"].(string),  // Google provides given_name
@@ -119,8 +119,8 @@ func (r *AuthController) getUserInfo(accessToken string) (map[string]interface{}
 	return userInfo, nil
 }
 
-func (r *AuthController) generateTokens(user *models.User) (*models.TokenDetails, error) {
-	accessTokenExpiry := time.Now().Add(time.Hour * 1) // 1 hour
+func (r *AuthController) generateTokens(user *models.Users) (*models.TokenDetails, error) {
+	accessTokenExpiry := time.Now().Add(time.Hour * 3) // 1 hour
 	accessClaims := &models.Claims{
 		UserID: user.ID.String(),
 		Email:  user.Email,
@@ -200,7 +200,7 @@ func (r *AuthController) RefreshToken(c *gin.Context) {
 	}
 	uintID := uint(id64)
 
-	var user models.User
+	var user models.Users
 	err = r.Repo.DB.First(&user, uintID).Error
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User Not Found"})
