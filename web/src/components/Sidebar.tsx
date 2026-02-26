@@ -1,17 +1,17 @@
-// components/Sidebar.tsx
-import React, { useState, useRef } from 'react';
-import { 
-  Menu, 
-  Home, 
-  Computer, 
-  Clock, 
-  Star, 
+import React, { useState, useRef } from "react";
+import {
+  Menu,
+  Home,
+  Computer,
+  Clock,
+  Star,
   Trash2,
   Plus,
   FolderPlus,
   Upload,
-  FolderUp
-} from 'lucide-react';
+  FolderUp,
+} from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface SidebarProps {
   onNewFolder: () => void;
@@ -19,22 +19,33 @@ interface SidebarProps {
   onFolderUpload: (files: FileList) => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ 
-  onNewFolder, 
-  onFileUpload, 
-  onFolderUpload 
+const Sidebar: React.FC<SidebarProps> = ({
+  onNewFolder,
+  onFileUpload,
+  onFolderUpload,
 }) => {
   const [isNewMenuOpen, setIsNewMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
+  const { user } = useAuth();
+
+  console.log(user);
+
+  const usage = {
+    used: user?.storageUsed ?? 0,
+    limit: user?.storageLimit ?? 0,
+  };
+
+  const percentUsed = usage ? (usage.used / usage.limit) * 100 : 0;
+
   const menuItems = [
-    { icon: Home, label: 'Home' },
-    { icon: Computer, label: 'My Drive' },
-    { icon: Clock, label: 'Recent' },
-    { icon: Star, label: 'Starred' },
-    { icon: Trash2, label: 'Trash' },
+    { icon: Home, label: "Home" },
+    { icon: Computer, label: "My Drive" },
+    { icon: Clock, label: "Recent" },
+    { icon: Star, label: "Starred" },
+    { icon: Trash2, label: "Trash" },
   ];
 
   const handleNewClick = () => {
@@ -63,9 +74,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div 
+    <div
       className={`relative h-screen bg-white border-r border-gray-200 transition-all duration-300 ${
-        isCollapsed ? 'w-20' : 'w-64'
+        isCollapsed ? "w-20" : "w-64"
       }`}
     >
       {/* Toggle button */}
@@ -82,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={handleNewClick}
             className={`flex items-center justify-center gap-2 w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors ${
-              isCollapsed ? 'px-2' : ''
+              isCollapsed ? "px-2" : ""
             }`}
           >
             <Plus size={20} />
@@ -92,13 +103,15 @@ const Sidebar: React.FC<SidebarProps> = ({
           {/* New menu dropdown */}
           {isNewMenuOpen && (
             <>
-              <div 
+              <div
                 className="fixed inset-0 z-10"
                 onClick={() => setIsNewMenuOpen(false)}
               />
-              <div className={`absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 ${
-                isCollapsed ? 'left-12' : ''
-              }`}>
+              <div
+                className={`absolute top-full left-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20 ${
+                  isCollapsed ? "left-12" : ""
+                }`}
+              >
                 <button
                   onClick={handleNewFolder}
                   className="flex items-center gap-3 w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors"
@@ -106,7 +119,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   <FolderPlus size={18} className="text-gray-600" />
                   <span>New folder</span>
                 </button>
-                
+
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="flex items-center gap-3 w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors"
@@ -121,7 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className="hidden"
                   onChange={handleFileUpload}
                 />
-                
+
                 <button
                   onClick={() => folderInputRef.current?.click()}
                   className="flex items-center gap-3 w-full px-4 py-2 text-left hover:bg-gray-50 transition-colors"
@@ -132,8 +145,8 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <input
                   ref={folderInputRef}
                   type="file"
-                //   webkitdirectory=""
-                //   directory=""
+                  //   webkitdirectory=""
+                  //   directory=""
                   multiple
                   className="hidden"
                   onChange={handleFolderUpload}
@@ -149,13 +162,26 @@ const Sidebar: React.FC<SidebarProps> = ({
             <button
               key={item.label}
               className={`flex items-center gap-3 w-full px-3 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
-                isCollapsed ? 'justify-center' : ''
+                isCollapsed ? "justify-center" : ""
               }`}
             >
               <item.icon size={20} />
               {!isCollapsed && <span>{item.label}</span>}
             </button>
           ))}
+          <div className="p-4 border-t">
+            <p className="text-xs text-gray-500 mb-1">
+              {usage
+                ? `${(usage.used / 1e6).toFixed(1)} MB of ${(usage.limit / 1e6).toFixed(1)} MB used`
+                : "Loading storage..."}
+            </p>
+            <div className="w-full bg-gray-200 h-1.5 rounded-full">
+              <div
+                className={`h-full rounded-full transition-all ${percentUsed > 90 ? "bg-red-500" : "bg-blue-500"}`}
+                style={{ width: `${Math.min(percentUsed, 100)}%` }}
+              />
+            </div>
+          </div>
         </nav>
       </div>
     </div>

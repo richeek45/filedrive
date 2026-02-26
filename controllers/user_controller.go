@@ -65,10 +65,10 @@ func (r *UserController) GetProfile(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"Email":   user.Email,
-		"Name":    user.FirstName,
-		"Picture": user.Picture,
-		"StorageUsed": user.StorageUsed,
-		"StorageLimit": user.StorageLimit,
+		"email":   user.Email,
+		"name":    user.FirstName,
+		"picture": user.Picture,
+		"storageUsed": user.StorageUsed,
+		"storageLimit": user.StorageLimit,
 	})
 }

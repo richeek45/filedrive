@@ -245,8 +245,6 @@ const Dashboard: React.FC = () => {
     activeUploads,
   } = useFolders(currentParentId);
 
-  console.log({ folders, files });
-
   const handleNewFolder = (name: string) => {
     if (isCreating) return;
 

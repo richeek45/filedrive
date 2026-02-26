@@ -7,6 +7,8 @@ export interface User {
   email: string;
   name?: string;
   picture?: string;
+  storageUsed: number;
+  storageLimit: number;
 }
 
 interface AuthContextType {
