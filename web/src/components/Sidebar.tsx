@@ -31,8 +31,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const { user } = useAuth();
 
-  console.log(user);
-
   const usage = {
     used: user?.storageUsed ?? 0,
     limit: user?.storageLimit ?? 0,

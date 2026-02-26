@@ -11,6 +11,7 @@ import {
   Edit2,
 } from "lucide-react";
 import { useUploadManager } from "../lib/uploadManager";
+import { useNavigate, useParams } from "react-router-dom";
 
 interface FileItem {
   id: string;
@@ -230,8 +231,9 @@ export const FileItem = ({
 };
 
 const Dashboard: React.FC = () => {
-  const [currentParentId, setCurrentParentId] = useState<string | null>(null);
+  const { folderId } = useParams<{ folderId?: string }>();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const {
     folders,
@@ -243,13 +245,13 @@ const Dashboard: React.FC = () => {
     isCreating,
     isLoading,
     activeUploads,
-  } = useFolders(currentParentId);
+  } = useFolders(folderId || null);
 
   const handleNewFolder = (name: string) => {
     if (isCreating) return;
 
     createFolder(
-      { name, parentId: currentParentId },
+      { name, parentId: folderId },
       {
         onSuccess: () => setIsModalOpen(false),
       },
@@ -280,13 +282,16 @@ const Dashboard: React.FC = () => {
   };
 
   const renderContent = () => {
+    const emptyText = folderId
+      ? "This folder is empty."
+      : "This drive is empty.";
     if (isLoading)
       return <div className="p-8 text-gray-500">Loading your files...</div>;
 
     if (folders.length === 0 && files.length == 0) {
       return (
         <div className="col-span-full text-center py-20 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
-          <p className="text-gray-500">This drive is empty.</p>
+          <p className="text-gray-500">{emptyText}</p>
         </div>
       );
     }
@@ -297,7 +302,7 @@ const Dashboard: React.FC = () => {
           <FolderItem
             key={item.ID}
             folder={item}
-            onClick={() => setCurrentParentId(item.ID)}
+            onClick={() => navigate(`/dashboard/${item.ID}`)}
           />
         ))}
         {files.map((item) => (
@@ -341,13 +346,20 @@ const Dashboard: React.FC = () => {
             <nav className="flex items-center gap-2 text-sm text-gray-500 mb-1">
               <span
                 className="cursor-pointer hover:text-blue-600"
-                onClick={() => setCurrentParentId(null)}
+                onClick={() => navigate("/dashboard")}
               >
                 Root
               </span>
-              {currentParentId && <span>/ Subfolder</span>}
+              {folderId && (
+                <>
+                  <span>/</span>
+                  <span className="font-medium text-gray-900">Subfolder</span>
+                </>
+              )}
             </nav>
-            <h1 className="text-2xl font-bold text-gray-900">My Drive</h1>
+            <h1 className="text-2xl font-bold text-gray-900">
+              {folderId ? "Folder View" : "My Drive"}
+            </h1>
           </div>
         </header>
 

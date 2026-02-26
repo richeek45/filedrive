@@ -26,7 +26,7 @@ type FileController struct {
 
 func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	var req struct {
-		FolderID string `json:"parentId"`
+		FolderID string `form:"parentId"`
 	}
 
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -38,7 +38,7 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
     if req.FolderID != "" {
         parsed := uuid.MustParse(req.FolderID)
         folderIDPtr = &parsed
-    }	
+    }
 	files, err := fc.Repo.GetFiles(userID, folderIDPtr)
 
 	if err != nil {

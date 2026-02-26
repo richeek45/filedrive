@@ -11,7 +11,6 @@ import {
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
 import { useState } from "react";
-import { api } from "../lib/api";
 
 export const useFolders = (parentId: string | null = null) => {
   const [uploads, setUploads] = useState<Record<string, number>>({});
@@ -109,7 +108,6 @@ export const useFolders = (parentId: string | null = null) => {
   const uploadFileMutation = useMutation({
     mutationFn: (file: File) =>
       uploadFileInParts(file, parentId, (percent) => {
-        console.log("percentage = ", percent);
         setUploads((prev) => ({ ...prev, [file.name]: percent }));
       }),
     onSuccess: (_, file) => {
