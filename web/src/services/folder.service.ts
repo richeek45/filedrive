@@ -28,17 +28,13 @@ export interface File {
 }
 
 export interface Folder {
-  ID: string;
-  Name: string;
-  OwnerID: string;
-  Parent: Folder | null;
-  ParentID: string | null;
-  User: User | null;
-  Folders: Folder[] | null;
-  Files: File[] | null;
-  IsDeleted: boolean;
-  CreatedAt: string;
-  UpdatedAt: string;
+  id: string;
+  name: string;
+  parentId: string | null;
+  folders: Folder[] | null;
+  files: File[] | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const fetchFolders = async (
