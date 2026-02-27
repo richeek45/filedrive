@@ -37,34 +37,140 @@ const getFileIcon = (mimeType: string | null) => {
   return "📄";
 };
 
+const ShareModal = ({ isOpen, onClose, itemName }: any) => {
+  const [email, setEmail] = useState("");
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+        <h2 className="text-xl font-semibold mb-1">Share "{itemName}"</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          Add people with their email addresses.
+        </p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Email address
+            </label>
+            <input
+              type="email"
+              placeholder="alex@example.com"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 mt-8">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => {
+                console.log("Shared with:", email);
+                onClose();
+              }}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
+            >
+              Send Invite
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const FolderItem = ({
   folder,
   onClick,
-}: {
-  folder: any;
-  onClick: () => void;
-}) => {
+  deleteFolder,
+  renameFolder,
+}: any) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
   return (
-    <div
-      onClick={onClick}
-      className="group flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer"
-    >
-      <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100">
-        <svg
-          className="w-8 h-8 text-blue-500"
-          fill="currentColor"
-          viewBox="0 0 20 20"
+    <>
+      <div className="group relative flex items-center gap-3 p-4 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:shadow-md transition-all cursor-pointer">
+        <div
+          onClick={onClick}
+          className="flex flex-1 items-center gap-3 min-w-0"
         >
-          <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-        </svg>
+          <div className="p-2 bg-blue-50 rounded-lg group-hover:bg-blue-100">
+            <svg
+              className="w-8 h-8 text-blue-500"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
+              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900 truncate">
+              {folder.Name}
+            </p>
+            <p className="text-xs text-gray-500">Folder</p>
+          </div>
+        </div>
+
+        {/* Action Menu */}
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowMenu(!showMenu);
+            }}
+            className="p-1 text-gray-400 hover:text-gray-600 rounded-md hover:bg-gray-100"
+          >
+            <MoreVertical size={18} />
+          </button>
+
+          {showMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(false);
+                }}
+              />
+              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-100 rounded-lg shadow-xl z-20 py-1 overflow-hidden">
+                <MenuOption
+                  icon={<Share size={14} />}
+                  label="Share"
+                  onClick={() => setIsShareOpen(true)}
+                />
+                <MenuOption
+                  icon={<Edit2 size={14} />}
+                  label="Rename"
+                  onClick={() => renameFolder(folder.ID)}
+                />
+                <hr className="my-1 border-gray-50" />
+                <MenuOption
+                  icon={<Trash size={14} />}
+                  label="Delete"
+                  danger
+                  onClick={() => deleteFolder(folder.ID)}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-900 truncate">
-          {folder.Name}
-        </p>
-        <p className="text-xs text-gray-500">Folder</p>
-      </div>
-    </div>
+
+      <ShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        itemName={folder.Name}
+      />
+    </>
   );
 };
 
@@ -90,6 +196,8 @@ export const FileItem = ({
   moveToTrash: (fileId: string) => void;
   uploadFile: (file: File) => void;
 }) => {
+  const [isShareOpen, setIsShareOpen] = useState(false);
+
   const [showMenu, setShowMenu] = useState(false);
   const isPaused = file.uploadStatus === "paused";
   const isUploading =
@@ -182,7 +290,6 @@ export const FileItem = ({
             <Play size={14} fill="currentColor" />
           </button>
         )}
-
         {/* Menu Toggle */}
         <div className="relative">
           <button
@@ -212,7 +319,10 @@ export const FileItem = ({
                 <MenuOption
                   icon={<Share size={16} />}
                   label="Share"
-                  onClick={() => {}}
+                  onClick={() => {
+                    setShowMenu(false);
+                    setIsShareOpen(true);
+                  }}
                 />
                 <hr className="my-1 border-gray-50" />
                 <MenuOption
@@ -226,6 +336,11 @@ export const FileItem = ({
           )}
         </div>
       </div>
+      <ShareModal
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
+        itemName={file.name}
+      />
     </div>
   );
 };
