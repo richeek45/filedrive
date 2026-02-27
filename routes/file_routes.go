@@ -6,13 +6,13 @@ import (
 	"github.com/richeek45/filedrive/middleware"
 )
 
-
 func FileRoutes(api *gin.RouterGroup, fileController *controllers.FileController) {
 	fileApi := api.Group("/files")
 	fileApi.Use(middleware.AuthMiddleware())
 	{
 		fileApi.GET("/", fileController.GetFilesFromParentFolder)
 		fileApi.GET("/:fileId/download", fileController.GetDownloadURL)
+		fileApi.PATCH("/:fileId/rename", fileController.RenameFile)
 		fileApi.PATCH("/:fileId/trash", fileController.MoveToTrash) // Add this for soft delete
 		fileApi.GET("/sync-active-uploads", fileController.SyncUserUploads)
 	}

@@ -13,5 +13,6 @@ func FolderRoutes(api *gin.RouterGroup, folderController *controllers.FolderCont
 	{
 		folderApi.GET("/", folderController.FindRootFolders)
 		folderApi.POST("/", folderController.CreateFolder)
+		folderApi.PATCH("/:folderId/rename", folderController.RenameFolder)
 	}
 }

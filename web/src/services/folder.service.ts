@@ -79,6 +79,11 @@ export const renameFileApi = async (fileId: string, name: string) => {
   return res.data;
 };
 
+export const renameFolderApi = async (folderId: string, name: string) => {
+  const res = await api.patch(`/folders/${folderId}/rename`, { name });
+  return res.data;
+};
+
 export const moveToTrashApi = (fileId: string) =>
   api.patch(`/files/${fileId}/trash`);
 

@@ -7,6 +7,7 @@ import {
   moveToTrashApi,
   renameFileApi,
   syncPendingFileUploads,
+  renameFolderApi,
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
@@ -51,6 +52,13 @@ export const useFolders = (
       renameFileApi(id, name),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ["files", parentId] }),
+  });
+
+  const renameFolder = useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      renameFolderApi(id, name),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["folders", parentId] }),
   });
 
   const moveToTrash = useMutation({
@@ -131,6 +139,7 @@ export const useFolders = (
     moveToTrash: moveToTrash.mutate,
     downloadFile: downloadFile.mutate,
     renameFile: renameFile.mutate,
+    renameFolder: renameFolder.mutate,
     isLoading: foldersQuery.isLoading,
     createFolder: createFolderMutation.mutate,
     uploadFile: uploadFileMutation.mutateAsync, // mutateAsync is better for loops

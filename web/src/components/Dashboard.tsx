@@ -87,14 +87,72 @@ const ShareModal = ({ isOpen, onClose, itemName }: any) => {
   );
 };
 
+const RenameModal = ({ isOpen, onClose, currentName, onRename }: any) => {
+  const [newName, setNewName] = useState(currentName);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newName.trim() && newName !== currentName) {
+      onRename(newName);
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-[2px]">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in duration-150">
+        <h2 className="text-lg font-semibold mb-4">Rename</h2>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            autoFocus
+            type="text"
+            className="w-full px-3 py-2 border-2 border-blue-500 rounded-lg outline-none mb-6 text-sm"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onFocus={(e) => e.target.select()}
+          />
+
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+            >
+              OK
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 export const FolderItem = ({
   folder,
   onClick,
-  deleteFolder,
   renameFolder,
-}: any) => {
+}: {
+  folder: any;
+  onClick: () => void;
+  renameFolder: ({ id, name }: { id: string; name: string }) => void;
+}) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+
+  const handleRenameSubmit = (newName: string) => {
+    console.log(`Renaming ${folder.id} to ${newName}`);
+    renameFolder({ id: folder.id, name: newName });
+  };
 
   return (
     <>
@@ -114,7 +172,7 @@ export const FolderItem = ({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-gray-900 truncate">
-              {folder.Name}
+              {folder.name}
             </p>
             <p className="text-xs text-gray-500">Folder</p>
           </div>
@@ -150,25 +208,30 @@ export const FolderItem = ({
                 <MenuOption
                   icon={<Edit2 size={14} />}
                   label="Rename"
-                  onClick={() => renameFolder(folder.ID)}
+                  onClick={() => setIsRenameOpen(true)}
                 />
                 <hr className="my-1 border-gray-50" />
-                <MenuOption
+                {/* <MenuOption
                   icon={<Trash size={14} />}
                   label="Delete"
                   danger
                   onClick={() => deleteFolder(folder.ID)}
-                />
+                /> */}
               </div>
             </>
           )}
         </div>
       </div>
-
+      <RenameModal
+        isOpen={isRenameOpen}
+        onClose={() => setIsRenameOpen(false)}
+        currentName={folder.name}
+        onRename={handleRenameSubmit}
+      />
       <ShareModal
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
-        itemName={folder.Name}
+        itemName={folder.name}
       />
     </>
   );
@@ -190,13 +253,16 @@ export const FileItem = ({
   downloadFile,
   moveToTrash,
   uploadFile,
+  renameFile,
 }: {
   file: any;
   downloadFile: (fileId: string) => void;
   moveToTrash: (fileId: string) => void;
   uploadFile: (file: File) => void;
+  renameFile: ({ id, name }: { id: string; name: string }) => void;
 }) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
 
   const [showMenu, setShowMenu] = useState(false);
   const isPaused = file.uploadStatus === "paused";
@@ -241,6 +307,11 @@ export const FileItem = ({
         new File([file], file.name, { type: fileData.mimeType }) as File,
       );
     }
+  };
+
+  const handleRenameSubmit = (newName: string) => {
+    console.log(`Renaming ${file.id} to ${newName}`);
+    renameFile({ name: newName, id: file.id });
   };
 
   return (
@@ -314,7 +385,7 @@ export const FileItem = ({
                 <MenuOption
                   icon={<Edit2 size={16} />}
                   label="Rename"
-                  onClick={() => {}}
+                  onClick={() => setIsRenameOpen(true)}
                 />
                 <MenuOption
                   icon={<Share size={16} />}
@@ -336,6 +407,12 @@ export const FileItem = ({
           )}
         </div>
       </div>
+      <RenameModal
+        isOpen={isRenameOpen}
+        onClose={() => setIsRenameOpen(false)}
+        currentName={file.name}
+        onRename={handleRenameSubmit}
+      />
       <ShareModal
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
@@ -360,6 +437,7 @@ const Dashboard: React.FC = () => {
     createFolder,
     uploadFile,
     renameFile,
+    renameFolder,
     isCreating,
     isLoading,
     activeUploads,
@@ -418,6 +496,7 @@ const Dashboard: React.FC = () => {
           <FolderItem
             key={item.ID}
             folder={item}
+            renameFolder={renameFolder}
             onClick={() => navigate(`/dashboard/${item.ID}`)}
           />
         ))}
@@ -425,6 +504,7 @@ const Dashboard: React.FC = () => {
           <FileItem
             key={item.ID}
             file={item}
+            renameFile={renameFile}
             downloadFile={downloadFile}
             moveToTrash={moveToTrash}
             uploadFile={uploadFile}

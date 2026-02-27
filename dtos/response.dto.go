@@ -14,3 +14,11 @@ type FileResponse struct {
 	CreatedAt time.Time `json:"createdAt"`
 	IsDeleted bool      `json:"isDeleted"`
 }
+
+type FolderResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	ParentID  uuid.UUID `json:"parentId"`
+	CreatedAt time.Time `json:"createdAt"`
+	IsDeleted bool      `json:"isDeleted"`
+}

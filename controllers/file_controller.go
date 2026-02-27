@@ -187,7 +187,7 @@ func (fc *FileController) RenameFile(c *gin.Context) {
 		return
 	}
 
-	fileID := uuid.MustParse(c.Param("id"))
+	fileID := uuid.MustParse(c.Param("fileId"))
 	userID := uuid.MustParse(c.GetString("userID"))
 
 	err := fc.Repo.DB.Model(&models.File{}).

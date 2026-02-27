@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/richeek45/filedrive/dtos"
+	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
 )
 
@@ -15,6 +17,27 @@ type FolderController struct {
 	Repo     *repositories.FolderRepository
 	S3Client *s3.Client
 	Bucket   string
+}
+
+func formatFolders(folders []models.Folder) []dtos.FolderResponse {
+	var response []dtos.FolderResponse
+
+	for _, f := range folders {
+		var parentID uuid.UUID
+		if f.ParentID != nil {
+			parentID = *f.ParentID
+		}
+
+		response = append(response, dtos.FolderResponse{
+			ID:        f.ID,
+			Name:      f.Name,
+			ParentID:  parentID,
+			CreatedAt: f.CreatedAt,
+			IsDeleted: f.IsDeleted,
+		})
+	}
+
+	return response
 }
 
 func (fc *FolderController) CreateFolder(c *gin.Context) {
@@ -77,8 +100,9 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		response := formatFolders(folders)
 
-		c.JSON(http.StatusOK, folders)
+		c.JSON(http.StatusOK, response)
 		return
 	}
 
@@ -94,6 +118,30 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	response := formatFolders(folders)
 
-	c.JSON(http.StatusOK, folders)
+	c.JSON(http.StatusOK, response)
+}
+
+func (fc *FolderController) RenameFolder(c *gin.Context) {
+	var req struct {
+		NewName string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	folderID := uuid.MustParse(c.Param("folderId"))
+	userID := uuid.MustParse(c.GetString("userID"))
+
+	err := fc.Repo.DB.Model(&models.Folder{}).
+		Where("id = ? AND owner_id = ?", folderID, userID).
+		Update("name", req.NewName).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Renamed successfully"})
 }
