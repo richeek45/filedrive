@@ -23,49 +23,47 @@ import (
 )
 
 type FileController struct {
-    Repo     *repositories.FileRepository
-    FolderRepo *repositories.FolderRepository
-    S3Client *s3.Client
-    Bucket   string
+	Repo       *repositories.FileRepository
+	FolderRepo *repositories.FolderRepository
+	S3Client   *s3.Client
+	Bucket     string
 }
 
 var (
-    folderCache = sync.Map{}
-    cleanupInterval = 5 * time.Minute
-) 
-
+	folderCache     = sync.Map{}
+	cleanupInterval = 5 * time.Minute
+)
 
 type CacheEntry struct {
-    folderID uuid.UUID
-    expiresAt time.Time
+	folderID  uuid.UUID
+	expiresAt time.Time
 }
 
 func getFolderCacheKey(userID uuid.UUID, rootID *uuid.UUID, path string) string {
-    rootStr := "root"
-    if rootID != nil {
-        rootStr = rootID.String()
-    }
-    return fmt.Sprintf("%s:%s:%s", userID.String(), rootStr, path)
+	rootStr := "root"
+	if rootID != nil {
+		rootStr = rootID.String()
+	}
+	return fmt.Sprintf("%s:%s:%s", userID.String(), rootStr, path)
 }
 
 func StartCacheCleaner() {
-    go func() {
-        ticker := time.NewTicker(cleanupInterval)
-        defer ticker.Stop()
+	go func() {
+		ticker := time.NewTicker(cleanupInterval)
+		defer ticker.Stop()
 
-        for range ticker.C {
-            now := time.Now()
-            folderCache.Range(func(key, value any) bool {
-                entry := value.(CacheEntry)
-                if now.After(entry.expiresAt) {
-                    folderCache.Delete(key)
-                }
-                return true
-            })
-        }
-    }()
+		for range ticker.C {
+			now := time.Now()
+			folderCache.Range(func(key, value any) bool {
+				entry := value.(CacheEntry)
+				if now.After(entry.expiresAt) {
+					folderCache.Delete(key)
+				}
+				return true
+			})
+		}
+	}()
 }
-
 
 //as for example this is folder uploaded
 // PhotoAlbums
@@ -82,12 +80,12 @@ func StartCacheCleaner() {
 //         ├── PIC5684.jpg
 //         └── PIC5712.jpg
 
-// this is one path -> PhotoAlbums/Birthdays/'Don's 40th birthday'/PIC2343.jpg. 
+// this is one path -> PhotoAlbums/Birthdays/'Don's 40th birthday'/PIC2343.jpg.
 // Solitting it gives [ PhotoAlbums, Birthdays, 'Don's 40th birthday', PIC2343.jpg ]
 // Store all the folders name with ID in a server cache first time and create all the folder with its previous index as the parentID if not exists
 // Next time another file uploads and file path is   PhotoAlbums/Birthdays/Jamie's 1st birthday/PIC1000.jpg
 // check if the folders are present in the cache, if yes then don't create a folder, only create the new folder 'Jamie's 1st birthday'
-// reset the cache after 10minutes. 
+// reset the cache after 10minutes.
 // then create the file with second last folder created as parentID get from cache. If not present search by name
 // then create the file with this id.
 // if relative path is not present -> do normal flow as before
@@ -95,6 +93,7 @@ func StartCacheCleaner() {
 func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	var req struct {
 		FolderID string `form:"parentId"`
+		IsTrash  bool   `form:"isTrash"`
 	}
 
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -103,63 +102,65 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	}
 	userID := uuid.MustParse(c.GetString("userID"))
 	var folderIDPtr *uuid.UUID
-    if req.FolderID != "" {
-        parsed := uuid.MustParse(req.FolderID)
-        folderIDPtr = &parsed
-    }
-	files, err := fc.Repo.GetFiles(userID, folderIDPtr)
+	if req.FolderID != "" {
+		parsed := uuid.MustParse(req.FolderID)
+		folderIDPtr = &parsed
+	}
+	files, err := fc.Repo.GetFiles(userID, folderIDPtr, req.IsTrash)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-    var response []dtos.FileResponse
+	var response []dtos.FileResponse
 
-    for _, f := range files {
-        response = append(response, dtos.FileResponse{
-            ID:        f.ID,
-            Name:      f.Name,
-            Size:      f.Size,
-            MimeType:  f.MimeType,
-            CreatedAt: f.CreatedAt,
-        })
-    }
+	for _, f := range files {
 
-    c.JSON(http.StatusOK, response)
+		response = append(response, dtos.FileResponse{
+			ID:        f.ID,
+			Name:      f.Name,
+			Size:      f.Size,
+			MimeType:  f.MimeType,
+			CreatedAt: f.CreatedAt,
+			IsDeleted: f.IsDeleted,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (fc *FileController) GetDownloadURL(c *gin.Context) {
-    fileID := c.Param("fileId")
-    userID := c.GetString("userID")
+	fileID := c.Param("fileId")
+	userID := c.GetString("userID")
 
-    file, err := fc.Repo.GetFileByID(uuid.MustParse(fileID), uuid.MustParse(userID))
-    if err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
-        return
-    }
+	file, err := fc.Repo.GetFileByID(uuid.MustParse(fileID), uuid.MustParse(userID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
 
 	// 1. URL-encode the filename to handle spaces and special characters
-    // PathEscape is better here than QueryEscape as it handles spaces as %20
-    encodedName := url.PathEscape(file.Name)
+	// PathEscape is better here than QueryEscape as it handles spaces as %20
+	encodedName := url.PathEscape(file.Name)
 
-    // 2. Use the RFC 6266 format: filename*=UTF-8''{encoded_name}
-    contentDisposition := fmt.Sprintf("attachment; filename*=UTF-8''%s", encodedName)
+	// 2. Use the RFC 6266 format: filename*=UTF-8''{encoded_name}
+	contentDisposition := fmt.Sprintf("attachment; filename*=UTF-8''%s", encodedName)
 
-    // 2. Create Presigned URL (Valid for 15 minutes)
-    presignClient := s3.NewPresignClient(fc.S3Client)
-    presignedReq, err := presignClient.PresignGetObject(c.Request.Context(), &s3.GetObjectInput{
-        Bucket:                     aws.String(fc.Bucket),
-        Key:                        aws.String(file.ObjectKey),
-        ResponseContentDisposition: aws.String(contentDisposition),
-    })
+	// 2. Create Presigned URL (Valid for 15 minutes)
+	presignClient := s3.NewPresignClient(fc.S3Client)
+	presignedReq, err := presignClient.PresignGetObject(c.Request.Context(), &s3.GetObjectInput{
+		Bucket:                     aws.String(fc.Bucket),
+		Key:                        aws.String(file.ObjectKey),
+		ResponseContentDisposition: aws.String(contentDisposition),
+	})
 
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate URL"})
-        return
-    }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate URL"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"url": presignedReq.URL})
+	c.JSON(http.StatusOK, gin.H{"url": presignedReq.URL})
 }
 
 func (fc *FileController) MoveToTrash(c *gin.Context) {
@@ -178,88 +179,88 @@ func (fc *FileController) MoveToTrash(c *gin.Context) {
 }
 
 func (fc *FileController) RenameFile(c *gin.Context) {
-    var req struct {
-        NewName string `json:"name" binding:"required"`
-    }
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var req struct {
+		NewName string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    fileID := uuid.MustParse(c.Param("id"))
-    userID := uuid.MustParse(c.GetString("userID"))
+	fileID := uuid.MustParse(c.Param("id"))
+	userID := uuid.MustParse(c.GetString("userID"))
 
-    err := fc.Repo.DB.Model(&models.File{}).
-        Where("id = ? AND owner_id = ?", fileID, userID).
-        Update("name", req.NewName).Error
+	err := fc.Repo.DB.Model(&models.File{}).
+		Where("id = ? AND owner_id = ?", fileID, userID).
+		Update("name", req.NewName).Error
 
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "Renamed successfully"})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Renamed successfully"})
 }
 
 func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 	var req struct {
-        FileName    string `json:"fileName" binding:"required"`
-        ContentType string `json:"contentType" binding:"required"`
-		Size        int64      `json:"size" binding:"required"`
-        ParentID    *uuid.UUID `json:"parentId"`
-		TotalChunks *int `json:"totalChunks" binding:"required"`
-        RelativePath string `json:"relativePath"`
-    }
+		FileName     string     `json:"fileName" binding:"required"`
+		ContentType  string     `json:"contentType" binding:"required"`
+		Size         int64      `json:"size" binding:"required"`
+		ParentID     *uuid.UUID `json:"parentId"`
+		TotalChunks  *int       `json:"totalChunks" binding:"required"`
+		RelativePath string     `json:"relativePath"`
+	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-    // validate the file size and throw the error -> max file size = 1 GB
+	// validate the file size and throw the error -> max file size = 1 GB
 
 	userID := uuid.MustParse(c.GetString("userID"))
-    finalParentID := req.ParentID
+	finalParentID := req.ParentID
 
 	// 1. Check DB for existing upload for this User + FileName + ParentID
-    var pending models.PendingUpload
-    query := fc.Repo.DB.Where("user_id = ? AND file_name = ?", userID, req.FileName)
-    if req.ParentID == nil {
-        query = query.Where("parent_id IS NULL")
-    } else {
-        query = query.Where("parent_id = ?", req.ParentID)
-    }
-    err := query.First(&pending).Error
+	var pending models.PendingUpload
+	query := fc.Repo.DB.Where("user_id = ? AND file_name = ?", userID, req.FileName)
+	if req.ParentID == nil {
+		query = query.Where("parent_id IS NULL")
+	} else {
+		query = query.Where("parent_id = ?", req.ParentID)
+	}
+	err := query.First(&pending).Error
 
-    if err == nil {
-        // Found existing! Ask S3 which parts it already has
-        out, S3err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
-            Bucket:   aws.String(fc.Bucket),
-            Key:      aws.String(pending.S3Key),
-            UploadId: aws.String(pending.UploadID),
-        })
+	if err == nil {
+		// Found existing! Ask S3 which parts it already has
+		out, S3err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
+			Bucket:   aws.String(fc.Bucket),
+			Key:      aws.String(pending.S3Key),
+			UploadId: aws.String(pending.UploadID),
+		})
 
-        if S3err != nil {
-            // If S3 says it doesn't exist (maybe expired), delete pending and start fresh
-            fc.Repo.DB.Delete(&pending)
-        } else {
-            // Return parts with ETags so frontend can "Complete" later
-            c.JSON(http.StatusOK, gin.H{
-                "uploadId":      pending.UploadID,
-                "key":           pending.S3Key,
-                "completedParts": out.Parts, // This includes PartNumber and ETag
-                "resumed":       true,
-            })
-            return
-        }
-    } else if !errors.Is(err, gorm.ErrRecordNotFound) {
-    fmt.Println("response not found")
-}
+		if S3err != nil {
+			// If S3 says it doesn't exist (maybe expired), delete pending and start fresh
+			fc.Repo.DB.Delete(&pending)
+		} else {
+			// Return parts with ETags so frontend can "Complete" later
+			c.JSON(http.StatusOK, gin.H{
+				"uploadId":       pending.UploadID,
+				"key":            pending.S3Key,
+				"completedParts": out.Parts, // This includes PartNumber and ETag
+				"resumed":        true,
+			})
+			return
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		fmt.Println("response not found")
+	}
 
-    key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)
-	
+	key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)
+
 	input := &s3.CreateMultipartUploadInput{
-		Bucket: &fc.Bucket,
-		Key: aws.String(key),
+		Bucket:      &fc.Bucket,
+		Key:         aws.String(key),
 		ContentType: aws.String(req.ContentType),
 	}
 
@@ -269,81 +270,76 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initiate upload"})
-        return
+		return
 	}
 
+	if req.RelativePath != "" {
+		pathsSplit := strings.Split(req.RelativePath, "/")
 
+		folderParts := pathsSplit[:len(pathsSplit)-1]
 
-    if req.RelativePath != "" {
-        pathsSplit := strings.Split(req.RelativePath, "/")
+		if len(folderParts) > 0 {
+			currentParentID := req.ParentID
+			accumulatedPath := ""
 
-        folderParts := pathsSplit[:len(pathsSplit)-1] 
+			for _, folderName := range folderParts {
+				accumulatedPath := filepath.Join(accumulatedPath, folderName)
+				cacheKey := getFolderCacheKey(userID, req.ParentID, accumulatedPath)
 
-        if len(folderParts) > 0 {
-            currentParentID := req.ParentID
-            accumulatedPath := ""
+				if val, ok := folderCache.Load(cacheKey); ok {
+					entry := val.(CacheEntry)
+					if time.Now().Before(entry.expiresAt) {
+						id := entry.folderID
+						currentParentID = &id
+						continue
+					}
+				}
 
-            for _, folderName := range folderParts {
-                accumulatedPath := filepath.Join(accumulatedPath, folderName)
-                cacheKey := getFolderCacheKey(userID, req.ParentID, accumulatedPath)
+				newFolderID, err := fc.FolderRepo.EnsureFolderExists(userID, currentParentID, folderName)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "Folder creation failed"})
+					return
+				}
 
-                if val, ok := folderCache.Load(cacheKey); ok {
-                    entry := val.(CacheEntry)
-                    if time.Now().Before(entry.expiresAt) {
-                        id := entry.folderID
-                        currentParentID = &id
-                        continue
-                    }
-                }
+				folderCache.Store(cacheKey, CacheEntry{
+					folderID:  newFolderID,
+					expiresAt: time.Now().Add(10 * time.Minute),
+				})
 
-                newFolderID, err := fc.FolderRepo.EnsureFolderExists(userID, currentParentID, folderName)
-                if err != nil {
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Folder creation failed"})
-                    return
-                }
+				currentParentID = &newFolderID
+			}
+			finalParentID = currentParentID
+		}
 
-                folderCache.Store(cacheKey, CacheEntry{
-                    folderID: newFolderID,
-                    expiresAt: time.Now().Add(10 * time.Minute),
-                })
-
-                currentParentID = &newFolderID                
-            }
-            finalParentID = currentParentID
-        }
-
-
-    }
-
+	}
 
 	newFile := &models.File{
-        Name:         req.FileName,
-        OwnerID:      userID,
-        FolderID:     finalParentID,
-        Size:         req.Size,
-        MimeType:     &req.ContentType,
-        BucketName:   fc.Bucket,
-        ObjectKey:    key,
-        S3UploadID:   resp.UploadId,
-        UploadStatus: "pending",
-		TotalChunks: req.TotalChunks,
-    }
+		Name:         req.FileName,
+		OwnerID:      userID,
+		FolderID:     finalParentID,
+		Size:         req.Size,
+		MimeType:     &req.ContentType,
+		BucketName:   fc.Bucket,
+		ObjectKey:    key,
+		S3UploadID:   resp.UploadId,
+		UploadStatus: "pending",
+		TotalChunks:  req.TotalChunks,
+	}
 
-    pendingEntry := &models.PendingUpload{
-        ID:         uuid.New(),
-        UserID:     userID,
-        UploadID:   *resp.UploadId,
-        S3Key:      key,
-        FileName:   req.FileName,
-        ParentID:   req.ParentID,
-        TotalParts: *req.TotalChunks,
-    }
+	pendingEntry := &models.PendingUpload{
+		ID:         uuid.New(),
+		UserID:     userID,
+		UploadID:   *resp.UploadId,
+		S3Key:      key,
+		FileName:   req.FileName,
+		ParentID:   req.ParentID,
+		TotalParts: *req.TotalChunks,
+	}
 
-    if err := fc.Repo.UpsertFilePending(newFile, pendingEntry); err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
-        return
-    }
-
+	if err := fc.Repo.UpsertFilePending(newFile, pendingEntry); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "DB error"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"uploadId": *resp.UploadId,
@@ -353,93 +349,95 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 
 func (fc *FileController) PresignPart(c *gin.Context) {
 	var req struct {
-        UploadID   string `json:"uploadId" binding:"required"`
-        Key        string `json:"key" binding:"required"`
-        PartNumber int32  `json:"partNumber" binding:"required"`
-    }
+		UploadID   string `json:"uploadId" binding:"required"`
+		Key        string `json:"key" binding:"required"`
+		PartNumber int32  `json:"partNumber" binding:"required"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	presignClient := s3.NewPresignClient(fc.S3Client)
 
 	// Request a presigned URL for the UploadPart operation
 	presignedReq, err := presignClient.PresignUploadPart(c.Request.Context(), &s3.UploadPartInput{
 		Bucket:     aws.String(fc.Bucket),
-        Key:        aws.String(req.Key),
-        UploadId:   aws.String(req.UploadID),
-        PartNumber: aws.Int32(req.PartNumber),
-	}) 
+		Key:        aws.String(req.Key),
+		UploadId:   aws.String(req.UploadID),
+		PartNumber: aws.Int32(req.PartNumber),
+	})
 
 	if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to presign part"})
-        return
-    }
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to presign part"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"url": presignedReq.URL})
+	c.JSON(http.StatusOK, gin.H{"url": presignedReq.URL})
 }
 
 func (fc *FileController) CompleteMultipartUpload(c *gin.Context) {
-    var req struct {
-        UploadID string `json:"uploadId" binding:"required"`
-        Key      string      `json:"key" binding:"required"`
-        ParentID *uuid.UUID  `json:"parentId"`
-        Parts    []types.CompletedPart `json:"parts" binding:"required"`
-    }
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var req struct {
+		UploadID string                `json:"uploadId" binding:"required"`
+		Key      string                `json:"key" binding:"required"`
+		ParentID *uuid.UUID            `json:"parentId"`
+		Parts    []types.CompletedPart `json:"parts" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-    result, err := fc.S3Client.CompleteMultipartUpload(c.Request.Context(), &s3.CompleteMultipartUploadInput{
-        Bucket:   aws.String(fc.Bucket),
-        Key:      aws.String(req.Key),
-        UploadId: aws.String(req.UploadID),
-        MultipartUpload: &types.CompletedMultipartUpload{
-            Parts: req.Parts,
-        },
-    })
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete S3 upload"})
-        return
-    }
+	result, err := fc.S3Client.CompleteMultipartUpload(c.Request.Context(), &s3.CompleteMultipartUploadInput{
+		Bucket:   aws.String(fc.Bucket),
+		Key:      aws.String(req.Key),
+		UploadId: aws.String(req.UploadID),
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: req.Parts,
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to complete S3 upload"})
+		return
+	}
 
 	finalETag := ""
-    if result.ETag != nil {
-        finalETag = *result.ETag
-    }
+	if result.ETag != nil {
+		finalETag = *result.ETag
+	}
 
 	err = fc.Repo.FinalizeFile(req.UploadID, len(req.Parts), finalETag, "completed")
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update file record"})
-        return
-    }
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update file record"})
+		return
+	}
 	fc.Repo.DB.Where("upload_id = ?", req.UploadID).Delete(&models.PendingUpload{})
 
-    c.JSON(http.StatusOK, gin.H{"message": "upload completed successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "upload completed successfully"})
 }
 
 // Syncs the files on opening my files tab to check and update the upload status of pending S3 multipart uploads
 func (fc *FileController) SyncUserUploads(c *gin.Context) {
 	userID := uuid.MustParse(c.GetString("userID"))
 
-    var pendingFiles []models.File
-    // Only sync files that aren't 'completed' or 'error'
-    fc.Repo.DB.Where("owner_id = ? AND upload_status IN ?", userID, []string{"pending", "uploading", "paused"}).Find(&pendingFiles)
+	var pendingFiles []models.File
+	// Only sync files that aren't 'completed' or 'error'
+	fc.Repo.DB.Where("owner_id = ? AND upload_status IN ?", userID, []string{"pending", "uploading", "paused"}).Find(&pendingFiles)
 
-    for _, file := range pendingFiles {
-        fmt.Println(file.Name)
-        if file.S3UploadID == nil { continue }
-        // if file.S3UploadID == nil || time.Since(file.UpdatedAt) < 5 * time.Minute { continue }
+	for _, file := range pendingFiles {
+		fmt.Println(file.Name)
+		if file.S3UploadID == nil {
+			continue
+		}
+		// if file.S3UploadID == nil || time.Since(file.UpdatedAt) < 5 * time.Minute { continue }
 
-        out, err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
-            Bucket:   aws.String(file.BucketName),
-            Key:      aws.String(file.ObjectKey),
-            UploadId: file.S3UploadID,
-        })
+		out, err := fc.S3Client.ListParts(c.Request.Context(), &s3.ListPartsInput{
+			Bucket:   aws.String(file.BucketName),
+			Key:      aws.String(file.ObjectKey),
+			UploadId: file.S3UploadID,
+		})
 
-        if err != nil {
+		if err != nil {
 			var apiErr smithy.APIError
 			// Check if the error is specifically because the upload no longer exists in S3
 			if errors.As(err, &apiErr) {
@@ -458,12 +456,12 @@ func (fc *FileController) SyncUserUploads(c *gin.Context) {
 			continue
 		}
 
-        // Update DB with what S3 actually has
-        fc.Repo.DB.Model(&file).Updates(map[string]interface{}{
-            "uploaded_chunks": len(out.Parts),
-            "upload_status":   "paused",
-        })
-    }
+		// Update DB with what S3 actually has
+		fc.Repo.DB.Model(&file).Updates(map[string]interface{}{
+			"uploaded_chunks": len(out.Parts),
+			"upload_status":   "paused",
+		})
+	}
 
-    c.JSON(http.StatusOK, gin.H{"message": "Sync complete"})
+	c.JSON(http.StatusOK, gin.H{"message": "Sync complete"})
 }

@@ -12,6 +12,7 @@ import {
   FolderUp,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface SidebarProps {
   onNewFolder: () => void;
@@ -28,6 +29,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
 
   const { user } = useAuth();
 
@@ -39,11 +41,11 @@ const Sidebar: React.FC<SidebarProps> = ({
   const percentUsed = usage ? (usage.used / usage.limit) * 100 : 0;
 
   const menuItems = [
-    { icon: Home, label: "Home" },
-    { icon: Computer, label: "My Drive" },
-    { icon: Clock, label: "Recent" },
-    { icon: Star, label: "Starred" },
-    { icon: Trash2, label: "Trash" },
+    { icon: Home, label: "Home", path: "/dashboard" },
+    { icon: Computer, label: "My Drive", path: "/dashboard" }, // Can point to root folder
+    { icon: Clock, label: "Recent", path: "/dashboard/recent" },
+    { icon: Star, label: "Starred", path: "/dashboard/starred" },
+    { icon: Trash2, label: "Trash", path: "/dashboard/trash" },
   ];
 
   const handleNewClick = () => {
@@ -158,6 +160,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         <nav className="space-y-1">
           {menuItems.map((item) => (
             <button
+              onClick={() => navigate(item.path)}
               key={item.label}
               className={`flex items-center gap-3 w-full px-3 py-2 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors ${
                 isCollapsed ? "justify-center" : ""

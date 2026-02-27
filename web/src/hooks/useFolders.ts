@@ -12,14 +12,17 @@ import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
 import { useState } from "react";
 
-export const useFolders = (parentId: string | null = null) => {
+export const useFolders = (
+  parentId: string | null = null,
+  isTrash: boolean = false,
+) => {
   const [uploads, setUploads] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
   const foldersQuery = useQuery({
     // Important: Key must include parentId so TanStack treats each folder level as a unique cache
     queryKey: ["folders", parentId],
-    queryFn: () => fetchFolders(parentId),
+    queryFn: () => fetchFolders(parentId, isTrash),
   });
 
   const syncQuery = useQuery({
@@ -31,7 +34,7 @@ export const useFolders = (parentId: string | null = null) => {
 
   const filesQuery = useQuery({
     queryKey: ["files", parentId],
-    queryFn: () => fetchFiles(parentId),
+    queryFn: () => fetchFiles(parentId, isTrash),
     enabled: syncQuery.isSuccess || syncQuery.isError,
   });
 

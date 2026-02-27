@@ -15,15 +15,15 @@ func NewFolderRepository(db *gorm.DB) *FolderRepository {
 }
 
 func (r *FolderRepository) EnsureFolderExists(userID uuid.UUID, parentID *uuid.UUID, name string) (uuid.UUID, error) {
-    var folder models.Folder
-    
-    err := r.DB.Where(models.Folder{
-        OwnerID:  userID,
-        ParentID: parentID,
-        Name:     name,
-    }).FirstOrCreate(&folder).Error
+	var folder models.Folder
 
-    return folder.ID, err
+	err := r.DB.Where(models.Folder{
+		OwnerID:  userID,
+		ParentID: parentID,
+		Name:     name,
+	}).FirstOrCreate(&folder).Error
+
+	return folder.ID, err
 }
 
 func (r *FolderRepository) CreateFolder(userID uuid.UUID, folderName string, parentID *uuid.UUID) (*models.Folder, error) {
@@ -41,24 +41,33 @@ func (r *FolderRepository) CreateFolder(userID uuid.UUID, folderName string, par
 	return &folder, nil
 }
 
-func (r *FolderRepository) GetRootLevelFolderFromUserID(userID uuid.UUID) ([]models.Folder, error) {
+// TODO - Merge the two get folder queries
+func (r *FolderRepository) GetRootLevelFolderFromUserID(userID uuid.UUID, isTrash bool) ([]models.Folder, error) {
 
 	var folders []models.Folder
 
-	err := r.DB.
-		Where("owner_id = ? AND parent_id IS NULL AND is_deleted = false", userID).
-		Find(&folders).Error
+	query := r.DB.Unscoped().Where("owner_id = ? AND parent_id IS NULL AND is_deleted = false", userID)
+
+	if isTrash {
+		query.Where("is_deleted = ?", isTrash)
+	}
+
+	err := query.Find(&folders).Error
 
 	return folders, err
 }
 
-func (r *FolderRepository) GetFoldersByParentID(userID uuid.UUID, parentID uuid.UUID) ([]models.Folder, error) {
+func (r *FolderRepository) GetFoldersByParentID(userID uuid.UUID, parentID uuid.UUID, isTrash bool) ([]models.Folder, error) {
 
 	var folders []models.Folder
 
-	err := r.DB.
-		Where("owner_id = ? AND parent_id = ? AND is_deleted = false", userID, parentID).
-		Find(&folders).Error
+	query := r.DB.Unscoped().Where("owner_id = ? AND parent_id = ? AND is_deleted = false", userID, parentID)
+
+	if isTrash {
+		query.Where("is_deleted = ?", isTrash)
+	}
+
+	err := query.Find(&folders).Error
 
 	return folders, err
 }

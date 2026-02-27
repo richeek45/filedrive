@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,32 +22,40 @@ func (r *FileRepository) GetFileByID(fileId uuid.UUID, userId uuid.UUID) (models
 }
 
 func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) error {
-    return r.DB.Model(&models.File{}).
-        Where("id = ? AND owner_id = ?", fileID, userID).
-        Updates(map[string]interface{}{
-            "is_deleted": true,
-            "deleted_at": time.Now(),
-        }).Error
+	return r.DB.Model(&models.File{}).
+		Where("id = ? AND owner_id = ?", fileID, userID).
+		Updates(map[string]interface{}{
+			"is_deleted": true,
+			"deleted_at": time.Now(),
+		}).Error
 }
 
 func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID) error {
-    var file models.File
-    err := r.DB.Where("id = ? AND owner_id = ? AND is_deleted = true", fileId, userId).Delete(file).Error
-    return err
+	var file models.File
+	err := r.DB.Where("id = ? AND owner_id = ? AND is_deleted = true", fileId, userId).Delete(file).Error
+	return err
 }
 
 func NewFileRepository(db *gorm.DB) *FileRepository {
 	return &FileRepository{DB: db}
 }
 
-func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID) ([]models.File, error) {
+func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID, isTrash bool) ([]models.File, error) {
 	var files []models.File
-	query := r.DB.Where("owner_id = ? AND is_deleted = false", userId)
+	fmt.Println(isTrash, folderID, userId)
+	query := r.DB.Unscoped().Where("owner_id = ? AND is_deleted = ?", userId, isTrash)
+	// Need to remove is_deleted bool from migration
 
-	if folderID != nil {
-		query = query.Where("folder_id = ?", *folderID)
+	if !isTrash {
+		if folderID != nil {
+			query = query.Where("folder_id = ?", *folderID)
+		} else {
+			query = query.Where("folder_id IS NULL")
+		}
 	} else {
-		query = query.Where("folder_id IS NULL") // Assuming root files have NULL parent
+		if folderID != nil {
+			query = query.Where("folder_id = ?", *folderID)
+		}
 	}
 
 	err := query.Find(&files).Error
@@ -57,19 +66,19 @@ func (r *FileRepository) UpsertFilePending(file *models.File, pendingEntry *mode
 	// We use Upsert (On Conflict) so if the user resumes an upload,
 	// we just update the existing record based on ObjectKey or ID
 	return r.DB.Transaction(func(tx *gorm.DB) error {
-        err := tx.Clauses(clause.OnConflict{
-            Columns:   []clause.Column{{Name: "object_key"}},
-            DoUpdates: clause.AssignmentColumns([]string{"updated_at", "s3_upload_id", "upload_status"}),
-        }).Create(file).Error
-        if err != nil {
-            return err
-        }
+		err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "object_key"}},
+			DoUpdates: clause.AssignmentColumns([]string{"updated_at", "s3_upload_id", "upload_status"}),
+		}).Create(file).Error
+		if err != nil {
+			return err
+		}
 
-        return tx.Clauses(clause.OnConflict{
-            Columns:   []clause.Column{{Name: "s3_key"}}, // Or "upload_id" depending on your constraint
-            DoUpdates: clause.AssignmentColumns([]string{"upload_id", "updated_at"}),
-        }).Create(pendingEntry).Error
-    })
+		return tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "s3_key"}}, // Or "upload_id" depending on your constraint
+			DoUpdates: clause.AssignmentColumns([]string{"upload_id", "updated_at"}),
+		}).Create(pendingEntry).Error
+	})
 }
 
 func (r *FileRepository) FinalizeFile(uploadID string, partsCount int, finalETag string, status string) error {

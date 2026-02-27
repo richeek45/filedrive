@@ -17,6 +17,14 @@ function App() {
             <Route path="/login" element={<Login />} />
             <Route path="/oauth-callback" element={<OAuthCallback />} />
             <Route
+              path="/dashboard/trash/:folderId?"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard/:folderId?"
               element={
                 <ProtectedRoute>

@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gin-gonic/gin"
@@ -10,9 +12,9 @@ import (
 )
 
 type FolderController struct {
-	Repo *repositories.FolderRepository
+	Repo     *repositories.FolderRepository
 	S3Client *s3.Client
-    Bucket   string
+	Bucket   string
 }
 
 func (fc *FolderController) CreateFolder(c *gin.Context) {
@@ -47,9 +49,16 @@ func (fc *FolderController) CreateFolder(c *gin.Context) {
 	c.JSON(http.StatusCreated, folder)
 }
 
-// GET /api/folder?parentId=xxx
 func (fc *FolderController) FindRootFolders(c *gin.Context) {
 	userRaw, exists := c.Get("userID")
+
+	isTrash, err := strconv.ParseBool(c.Query("isTrash"))
+	if err != nil {
+		fmt.Printf("Error converting string \"%s\": %v\n", c.Query("isTrash"), err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -62,9 +71,8 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 	}
 	parentIDParam := c.Query("parentId")
 
-	// If no parentId → root folders
 	if parentIDParam == "" {
-		folders, err := fc.Repo.GetRootLevelFolderFromUserID(userID)
+		folders, err := fc.Repo.GetRootLevelFolderFromUserID(userID, isTrash)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -81,7 +89,7 @@ func (fc *FolderController) FindRootFolders(c *gin.Context) {
 		return
 	}
 
-	folders, err := fc.Repo.GetFoldersByParentID(userID, parentUUID)
+	folders, err := fc.Repo.GetFoldersByParentID(userID, parentUUID, isTrash)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

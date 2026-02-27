@@ -11,7 +11,7 @@ import {
   Edit2,
 } from "lucide-react";
 import { useUploadManager } from "../lib/uploadManager";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 interface FileItem {
   id: string;
@@ -234,6 +234,8 @@ const Dashboard: React.FC = () => {
   const { folderId } = useParams<{ folderId?: string }>();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isTrashView = pathname.includes("/trash");
 
   const {
     folders,
@@ -242,10 +244,11 @@ const Dashboard: React.FC = () => {
     moveToTrash,
     createFolder,
     uploadFile,
+    renameFile,
     isCreating,
     isLoading,
     activeUploads,
-  } = useFolders(folderId || null);
+  } = useFolders(folderId || null, isTrashView);
 
   const handleNewFolder = (name: string) => {
     if (isCreating) return;

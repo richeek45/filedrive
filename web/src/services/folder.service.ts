@@ -43,10 +43,11 @@ export interface Folder {
 
 export const fetchFolders = async (
   parentId: string | null = null,
+  isTrash: boolean,
 ): Promise<Folder[]> => {
   // Use params to automatically format the URL: /folders?parentId=...
   const res = await api.get("/folders/", {
-    params: parentId ? { parentId } : {},
+    params: parentId ? { parentId, isTrash } : { isTrash },
   });
 
   return res.data;
@@ -54,9 +55,10 @@ export const fetchFolders = async (
 
 export const fetchFiles = async (
   parentId: string | null = null,
+  isTrash: boolean,
 ): Promise<File[]> => {
   const res = await api.get("/files/", {
-    params: parentId ? { parentId } : {},
+    params: parentId ? { parentId, isTrash } : { isTrash },
   });
 
   return res.data;
