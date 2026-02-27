@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -20,9 +24,73 @@ import (
 
 type FileController struct {
     Repo     *repositories.FileRepository
+    FolderRepo *repositories.FolderRepository
     S3Client *s3.Client
     Bucket   string
 }
+
+var (
+    folderCache = sync.Map{}
+    cleanupInterval = 5 * time.Minute
+) 
+
+
+type CacheEntry struct {
+    folderID uuid.UUID
+    expiresAt time.Time
+}
+
+func getFolderCacheKey(userID uuid.UUID, rootID *uuid.UUID, path string) string {
+    rootStr := "root"
+    if rootID != nil {
+        rootStr = rootID.String()
+    }
+    return fmt.Sprintf("%s:%s:%s", userID.String(), rootStr, path)
+}
+
+func StartCacheCleaner() {
+    go func() {
+        ticker := time.NewTicker(cleanupInterval)
+        defer ticker.Stop()
+
+        for range ticker.C {
+            now := time.Now()
+            folderCache.Range(func(key, value any) bool {
+                entry := value.(CacheEntry)
+                if now.After(entry.expiresAt) {
+                    folderCache.Delete(key)
+                }
+                return true
+            })
+        }
+    }()
+}
+
+
+//as for example this is folder uploaded
+// PhotoAlbums
+// ├── Birthdays
+// │   ├── Jamie's 1st birthday
+// │   │   ├── PIC1000.jpg
+// │   │   └── PIC1044.jpg
+// │   └── Don's 40th birthday
+// │       ├── PIC2343.jpg
+// │       └── PIC2356.jpg
+// └── Vacations
+//     └── Mars
+//         ├── PIC5556.jpg
+//         ├── PIC5684.jpg
+//         └── PIC5712.jpg
+
+// this is one path -> PhotoAlbums/Birthdays/'Don's 40th birthday'/PIC2343.jpg. 
+// Solitting it gives [ PhotoAlbums, Birthdays, 'Don's 40th birthday', PIC2343.jpg ]
+// Store all the folders name with ID in a server cache first time and create all the folder with its previous index as the parentID if not exists
+// Next time another file uploads and file path is   PhotoAlbums/Birthdays/Jamie's 1st birthday/PIC1000.jpg
+// check if the folders are present in the cache, if yes then don't create a folder, only create the new folder 'Jamie's 1st birthday'
+// reset the cache after 10minutes. 
+// then create the file with second last folder created as parentID get from cache. If not present search by name
+// then create the file with this id.
+// if relative path is not present -> do normal flow as before
 
 func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	var req struct {
@@ -62,7 +130,7 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 }
 
 func (fc *FileController) GetDownloadURL(c *gin.Context) {
-    fileID := c.Param("id")
+    fileID := c.Param("fileId")
     userID := c.GetString("userID")
 
     file, err := fc.Repo.GetFileByID(uuid.MustParse(fileID), uuid.MustParse(userID))
@@ -139,6 +207,7 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 		Size        int64      `json:"size" binding:"required"`
         ParentID    *uuid.UUID `json:"parentId"`
 		TotalChunks *int `json:"totalChunks" binding:"required"`
+        RelativePath string `json:"relativePath"`
     }
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -149,6 +218,7 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
     // validate the file size and throw the error -> max file size = 1 GB
 
 	userID := uuid.MustParse(c.GetString("userID"))
+    finalParentID := req.ParentID
 
 	// 1. Check DB for existing upload for this User + FileName + ParentID
     var pending models.PendingUpload
@@ -202,10 +272,54 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
         return
 	}
 
+
+
+    if req.RelativePath != "" {
+        pathsSplit := strings.Split(req.RelativePath, "/")
+
+        folderParts := pathsSplit[:len(pathsSplit)-1] 
+
+        if len(folderParts) > 0 {
+            currentParentID := req.ParentID
+            accumulatedPath := ""
+
+            for _, folderName := range folderParts {
+                accumulatedPath := filepath.Join(accumulatedPath, folderName)
+                cacheKey := getFolderCacheKey(userID, req.ParentID, accumulatedPath)
+
+                if val, ok := folderCache.Load(cacheKey); ok {
+                    entry := val.(CacheEntry)
+                    if time.Now().Before(entry.expiresAt) {
+                        id := entry.folderID
+                        currentParentID = &id
+                        continue
+                    }
+                }
+
+                newFolderID, err := fc.FolderRepo.EnsureFolderExists(userID, currentParentID, folderName)
+                if err != nil {
+                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Folder creation failed"})
+                    return
+                }
+
+                folderCache.Store(cacheKey, CacheEntry{
+                    folderID: newFolderID,
+                    expiresAt: time.Now().Add(10 * time.Minute),
+                })
+
+                currentParentID = &newFolderID                
+            }
+            finalParentID = currentParentID
+        }
+
+
+    }
+
+
 	newFile := &models.File{
         Name:         req.FileName,
         OwnerID:      userID,
-        FolderID:     req.ParentID,
+        FolderID:     finalParentID,
         Size:         req.Size,
         MimeType:     &req.ContentType,
         BucketName:   fc.Bucket,

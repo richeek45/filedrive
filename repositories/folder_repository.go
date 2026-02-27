@@ -6,15 +6,27 @@ import (
 	"gorm.io/gorm"
 )
 
-type FolderRepostory struct {
+type FolderRepository struct {
 	DB *gorm.DB
 }
 
-func NewFolderRepository(db *gorm.DB) *FolderRepostory {
-	return &FolderRepostory{DB: db}
+func NewFolderRepository(db *gorm.DB) *FolderRepository {
+	return &FolderRepository{DB: db}
 }
 
-func (r *FolderRepostory) CreateFolder(userID uuid.UUID, folderName string, parentID *uuid.UUID) (*models.Folder, error) {
+func (r *FolderRepository) EnsureFolderExists(userID uuid.UUID, parentID *uuid.UUID, name string) (uuid.UUID, error) {
+    var folder models.Folder
+    
+    err := r.DB.Where(models.Folder{
+        OwnerID:  userID,
+        ParentID: parentID,
+        Name:     name,
+    }).FirstOrCreate(&folder).Error
+
+    return folder.ID, err
+}
+
+func (r *FolderRepository) CreateFolder(userID uuid.UUID, folderName string, parentID *uuid.UUID) (*models.Folder, error) {
 
 	folder := models.Folder{
 		Name:     folderName,
@@ -29,7 +41,7 @@ func (r *FolderRepostory) CreateFolder(userID uuid.UUID, folderName string, pare
 	return &folder, nil
 }
 
-func (r *FolderRepostory) GetRootLevelFolderFromUserID(userID uuid.UUID) ([]models.Folder, error) {
+func (r *FolderRepository) GetRootLevelFolderFromUserID(userID uuid.UUID) ([]models.Folder, error) {
 
 	var folders []models.Folder
 
@@ -40,7 +52,7 @@ func (r *FolderRepostory) GetRootLevelFolderFromUserID(userID uuid.UUID) ([]mode
 	return folders, err
 }
 
-func (r *FolderRepostory) GetFoldersByParentID(userID uuid.UUID, parentID uuid.UUID) ([]models.Folder, error) {
+func (r *FolderRepository) GetFoldersByParentID(userID uuid.UUID, parentID uuid.UUID) ([]models.Folder, error) {
 
 	var folders []models.Folder
 

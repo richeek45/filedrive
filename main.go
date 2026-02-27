@@ -62,6 +62,8 @@ func main() {
 
 	cronJob.Start()
 
+	controllers.StartCacheCleaner()
+
 	var allowedOrigins []string
 	if env == "production" {
 		allowedOrigins = []string{
@@ -106,6 +108,7 @@ func main() {
 	fileRepo := repositories.NewFileRepository(db)
 	fileController := &controllers.FileController{ 
 		Repo: fileRepo,
+		FolderRepo: folderRepo,
 		S3Client: s3Client,
 		Bucket: bucketName,
 	}

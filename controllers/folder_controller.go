@@ -10,7 +10,7 @@ import (
 )
 
 type FolderController struct {
-	Repo *repositories.FolderRepostory
+	Repo *repositories.FolderRepository
 	S3Client *s3.Client
     Bucket   string
 }

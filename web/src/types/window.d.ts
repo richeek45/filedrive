@@ -1,3 +1,5 @@
+import "react";
+
 export {};
 
 declare global {
@@ -30,5 +32,12 @@ declare global {
     kind: "file" | "directory";
     name: string;
     isSameEntry(other: FileSystemHandle): Promise<boolean>;
+  }
+}
+
+declare module "react" {
+  interface InputHTMLAttributes<T> extends HTMLAttributes<T> {
+    webkitdirectory?: string | boolean;
+    directory?: string | boolean;
   }
 }

@@ -18,6 +18,7 @@ export const uploadFileInParts = async (
       parentId: parentId,
       size: file.size,
       totalChunks: totalParts,
+      relativePath: file?.webkitRelativePath,
     });
 
     const { uploadId, key, completedParts = [], resumed } = initData;

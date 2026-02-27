@@ -265,7 +265,6 @@ const Dashboard: React.FC = () => {
     // Find a way to fire multiple file uploads simultaneously
     for (const file of fileArray) {
       try {
-        console.log("Initiating upload");
         await uploadFile(file);
       } catch (err) {
         console.error("Upload failed for one file, continuing with others...");
@@ -276,7 +275,6 @@ const Dashboard: React.FC = () => {
   const handleFolderUpload = async (files: FileList) => {
     const fileArray = Array.from(files);
     for (const file of fileArray) {
-      // Your backend can use file.webkitRelativePath to reconstruct folders
       await uploadFile(file);
     }
   };

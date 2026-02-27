@@ -142,9 +142,9 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </button>
                 <input
                   ref={folderInputRef}
+                  webkitdirectory=""
+                  directory=""
                   type="file"
-                  //   webkitdirectory=""
-                  //   directory=""
                   multiple
                   className="hidden"
                   onChange={handleFolderUpload}
