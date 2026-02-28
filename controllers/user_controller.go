@@ -37,12 +37,6 @@ func (r *UserController) CreateUser(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"data": user})
 }
 
-func (r *UserController) GetByID(id uuid.UUID) (*models.Users, error) {
-	var user models.Users
-	err := r.Repo.DB.First(&user, "id = ?", id).Error
-	return &user, err
-}
-
 func (r *UserController) GetProfile(c *gin.Context) {
 	userRaw, exists := c.Get("userID")
 	if !exists {
@@ -57,7 +51,7 @@ func (r *UserController) GetProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := r.GetByID(parsedID)
+	user, err := r.Repo.GetByID(parsedID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found in database"})
 		return

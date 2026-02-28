@@ -69,31 +69,6 @@ func StartCacheCleaner() {
 	}()
 }
 
-//as for example this is folder uploaded
-// PhotoAlbums
-// ├── Birthdays
-// │   ├── Jamie's 1st birthday
-// │   │   ├── PIC1000.jpg
-// │   │   └── PIC1044.jpg
-// │   └── Don's 40th birthday
-// │       ├── PIC2343.jpg
-// │       └── PIC2356.jpg
-// └── Vacations
-//     └── Mars
-//         ├── PIC5556.jpg
-//         ├── PIC5684.jpg
-//         └── PIC5712.jpg
-
-// this is one path -> PhotoAlbums/Birthdays/'Don's 40th birthday'/PIC2343.jpg.
-// Solitting it gives [ PhotoAlbums, Birthdays, 'Don's 40th birthday', PIC2343.jpg ]
-// Store all the folders name with ID in a server cache first time and create all the folder with its previous index as the parentID if not exists
-// Next time another file uploads and file path is   PhotoAlbums/Birthdays/Jamie's 1st birthday/PIC1000.jpg
-// check if the folders are present in the cache, if yes then don't create a folder, only create the new folder 'Jamie's 1st birthday'
-// reset the cache after 10minutes.
-// then create the file with second last folder created as parentID get from cache. If not present search by name
-// then create the file with this id.
-// if relative path is not present -> do normal flow as before
-
 func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	var req struct {
 		FolderID string `form:"parentId"`
@@ -220,10 +195,19 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 		return
 	}
 
-	// validate the file size and throw the error -> max file size = 1 GB
-
 	userID := uuid.MustParse(c.GetString("userID"))
 	finalParentID := req.ParentID
+
+	user, err := fc.UserRepo.GetByID(userID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+
+	if user.StorageUsed+req.Size >= user.StorageLimit {
+		c.JSON(http.StatusInsufficientStorage, gin.H{"error": "Not enough space. Delete some files"})
+		return
+	}
 
 	// 1. Check DB for existing upload for this User + FileName + ParentID
 	var pending models.PendingUpload
@@ -233,7 +217,7 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 	} else {
 		query = query.Where("parent_id = ?", req.ParentID)
 	}
-	err := query.First(&pending).Error
+	err = query.First(&pending).Error
 
 	if err == nil {
 		// Found existing! Ask S3 which parts it already has
