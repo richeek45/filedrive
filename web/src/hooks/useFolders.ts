@@ -127,6 +127,7 @@ export const useFolders = (
       queryClient.invalidateQueries({ queryKey: ["files", parentId] });
       queryClient.invalidateQueries({ queryKey: ["folders", parentId] });
       queryClient.invalidateQueries({ queryKey: ["files", "sync"] });
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
     },
   });
 

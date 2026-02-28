@@ -22,12 +22,21 @@ func (r *FileRepository) GetFileByID(fileId uuid.UUID, userId uuid.UUID) (models
 }
 
 func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) error {
-	return r.DB.Model(&models.File{}).
-		Where("id = ? AND owner_id = ?", fileID, userID).
-		Updates(map[string]interface{}{
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		var file models.File
+		if err := tx.Where("id = ? AND owner_id = ?", fileID, userID).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&file).Updates(map[string]interface{}{
 			"is_deleted": true,
 			"deleted_at": time.Now(),
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		return tx.Model(&models.Users{}).Where("id = ?", file.OwnerID).
+			UpdateColumn("storage_used", gorm.Expr("storage_used - ?", file.Size)).Error
+	})
 }
 
 func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID) error {
@@ -82,13 +91,24 @@ func (r *FileRepository) UpsertFilePending(file *models.File, pendingEntry *mode
 }
 
 func (r *FileRepository) FinalizeFile(uploadID string, partsCount int, finalETag string, status string) error {
-	return r.DB.Model(&models.File{}).
-		Where("s3_upload_id = ?", uploadID).
-		Updates(map[string]interface{}{
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		var file models.File
+		if err := tx.Where("s3_upload_id = ?", uploadID).First(&file).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Model(&file).Updates(map[string]interface{}{
 			"upload_status":         status,
-			"s3_upload_id":          nil, // Clear the upload ID once done
+			"e_tag":                 finalETag,
+			"s3_upload_id":          nil,
 			"uploaded_chunks":       partsCount,
 			"uploaded_part_numbers": partsCount,
-			"e_tag":                 finalETag,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+
+		// Update the user storage directly here instead of a hook
+		return tx.Model(&models.Users{}).Where("id = ?", file.OwnerID).
+			UpdateColumn("storage_used", gorm.Expr("storage_used + ?", file.Size)).Error
+	})
 }

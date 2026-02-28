@@ -1,6 +1,7 @@
 import { createContext, useState, useContext, useEffect } from "react";
 import type { ReactNode } from "react";
 import authService from "../services/auth";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 export interface User {
   id: string;
@@ -12,7 +13,7 @@ export interface User {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: User | null | undefined;
   loading: boolean;
   login: () => void;
   logout: () => void;
@@ -26,39 +27,26 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const token = authService.getAccessToken();
-    if (token && !authService.isTokenExpired()) {
-      fetchUserProfile();
-    } else {
-      setLoading(false);
-    }
-  }, []);
+  const { data: user, isLoading: loading } = useQuery({
+    queryKey: ["authUser"],
+    queryFn: async () => {
+      const token = authService.getAccessToken();
+      if (!token || authService.isTokenExpired()) {
+        return null;
+      }
 
-  const fetchUserProfile = async (): Promise<void> => {
-    try {
       const response = await authService.fetchWithAuth(
         `${authService.getApiUrl()}/users/profile`,
       );
 
-      console.log(response);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch user profile");
-      }
-
-      const userData: User = await response.json();
-      setUser(userData);
-    } catch (error) {
-      console.error("Failed to fetch user profile:", error);
-      // authService.logout();
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (!response.ok) throw new Error("Failed to fetch user profile");
+      return (await response.json()) as User;
+    },
+    staleTime: Infinity,
+    retry: false,
+  });
 
   const login = (): void => {
     authService.googleLogin();
@@ -66,7 +54,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = (): void => {
     authService.logout();
-    setUser(null);
+    // Clear the query cache so the next user doesn't see old data
+    queryClient.setQueryData(["authUser"], null);
+    queryClient.removeQueries();
   };
 
   const value: AuthContextType = {
