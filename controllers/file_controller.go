@@ -537,7 +537,7 @@ func (fc *FileController) ShareFilesToUsersByEmails(c *gin.Context) {
 
 func (fc *FileController) sendShareEmails(users []models.Users, fileName string) {
 	m := mail.NewMsg()
-	if err := m.From("richeek45@gmail.com"); err != nil {
+	if err := m.From(os.Getenv("GMAIL_USER")); err != nil {
 		fmt.Printf("failed to set from address: %v\n", err)
 		return
 	}
