@@ -90,3 +90,13 @@ export const createFolderApi = async (payload: {
   const res = await api.post("/folders/", payload);
   return res.data;
 };
+
+export const shareFilesApi = async (payload: {
+  fileId: string;
+  folderId: string;
+  emails: string[];
+  permission: string;
+}) => {
+  const res = await api.post("/files/share", payload);
+  return res.data;
+};

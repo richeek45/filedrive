@@ -99,18 +99,19 @@ func main() {
 
 	folderRepo := repositories.NewFolderRepository(db)
 	folderController := &controllers.FolderController{
-		Repo: folderRepo,
+		Repo:     folderRepo,
 		S3Client: s3Client,
-        Bucket:   bucketName,
+		Bucket:   bucketName,
 	}
 	routes.FolderRoutes(api, folderController)
 
 	fileRepo := repositories.NewFileRepository(db)
-	fileController := &controllers.FileController{ 
-		Repo: fileRepo,
+	fileController := &controllers.FileController{
+		Repo:       fileRepo,
 		FolderRepo: folderRepo,
-		S3Client: s3Client,
-		Bucket: bucketName,
+		UserRepo:   userRepo,
+		S3Client:   s3Client,
+		Bucket:     bucketName,
 	}
 	routes.FileRoutes(api, fileController)
 

@@ -37,10 +37,21 @@ const getFileIcon = (mimeType: string | null) => {
   return "📄";
 };
 
-const ShareModal = ({ isOpen, onClose, itemName }: any) => {
+const ShareModal = ({ isOpen, onClose, shareFile, itemName, file }: any) => {
   const [email, setEmail] = useState("");
 
   if (!isOpen) return null;
+
+  const handleShareFile = async () => {
+    console.log("Shared with:", email);
+    await shareFile({
+      fileId: file.id,
+      folderId: file.parentId,
+      permission: "viewer",
+      emails: [email],
+    });
+    onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -72,10 +83,7 @@ const ShareModal = ({ isOpen, onClose, itemName }: any) => {
               Cancel
             </button>
             <button
-              onClick={() => {
-                console.log("Shared with:", email);
-                onClose();
-              }}
+              onClick={handleShareFile}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
             >
               Send Invite
@@ -140,10 +148,22 @@ export const FolderItem = ({
   folder,
   onClick,
   renameFolder,
+  shareFile,
 }: {
   folder: any;
   onClick: () => void;
   renameFolder: ({ id, name }: { id: string; name: string }) => void;
+  shareFile: ({
+    fileId,
+    folderId,
+    permission,
+    emails,
+  }: {
+    fileId: string;
+    folderId: string;
+    emails: string[];
+    permission: string;
+  }) => void;
 }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -230,6 +250,7 @@ export const FolderItem = ({
       />
       <ShareModal
         isOpen={isShareOpen}
+        shareFile={shareFile}
         onClose={() => setIsShareOpen(false)}
         itemName={folder.name}
       />
@@ -254,12 +275,24 @@ export const FileItem = ({
   moveToTrash,
   uploadFile,
   renameFile,
+  shareFile,
 }: {
   file: any;
   downloadFile: (fileId: string) => void;
   moveToTrash: (fileId: string) => void;
   uploadFile: (file: File) => void;
   renameFile: ({ id, name }: { id: string; name: string }) => void;
+  shareFile: ({
+    fileId,
+    folderId,
+    permission,
+    emails,
+  }: {
+    fileId: string;
+    folderId: string;
+    emails: string[];
+    permission: string;
+  }) => void;
 }) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
@@ -414,6 +447,8 @@ export const FileItem = ({
         onRename={handleRenameSubmit}
       />
       <ShareModal
+        file={file}
+        shareFile={shareFile}
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         itemName={file.name}
@@ -438,6 +473,7 @@ const Dashboard: React.FC = () => {
     uploadFile,
     renameFile,
     renameFolder,
+    shareFile,
     isCreating,
     isLoading,
     activeUploads,
@@ -497,6 +533,7 @@ const Dashboard: React.FC = () => {
             key={item.id}
             folder={item}
             renameFolder={renameFolder}
+            shareFile={shareFile}
             onClick={() => navigate(`/dashboard/${item.id}`)}
           />
         ))}
@@ -508,6 +545,7 @@ const Dashboard: React.FC = () => {
             downloadFile={downloadFile}
             moveToTrash={moveToTrash}
             uploadFile={uploadFile}
+            shareFile={shareFile}
           />
         ))}
         {Object.entries(activeUploads).map(([fileName, progress]) => (

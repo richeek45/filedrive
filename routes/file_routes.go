@@ -15,6 +15,7 @@ func FileRoutes(api *gin.RouterGroup, fileController *controllers.FileController
 		fileApi.PATCH("/:fileId/rename", fileController.RenameFile)
 		fileApi.PATCH("/:fileId/trash", fileController.MoveToTrash) // Add this for soft delete
 		fileApi.GET("/sync-active-uploads", fileController.SyncUserUploads)
+		fileApi.POST("/share", fileController.ShareFilesToUsersByEmails)
 	}
 
 	uploadApi := fileApi.Group("/uploads")

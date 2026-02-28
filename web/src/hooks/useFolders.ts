@@ -8,6 +8,7 @@ import {
   renameFileApi,
   syncPendingFileUploads,
   renameFolderApi,
+  shareFilesApi,
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
@@ -129,6 +130,25 @@ export const useFolders = (
     },
   });
 
+  const shareFileMutation = useMutation({
+    mutationFn: ({
+      fileId,
+      folderId,
+      emails,
+      permission,
+    }: {
+      fileId: string;
+      folderId: string;
+      emails: string[];
+      permission: string;
+    }) => shareFilesApi({ fileId, folderId, emails, permission }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files", parentId] });
+      queryClient.invalidateQueries({ queryKey: ["folders", parentId] });
+      queryClient.invalidateQueries({ queryKey: ["files", "sync"] });
+    },
+  });
+
   return {
     folders: foldersQuery.data ?? [],
     files: filesQuery.data ?? [],
@@ -139,6 +159,7 @@ export const useFolders = (
     isLoading: foldersQuery.isLoading,
     createFolder: createFolderMutation.mutate,
     uploadFile: uploadFileMutation.mutateAsync, // mutateAsync is better for loops
+    shareFile: shareFileMutation.mutate,
     activeUploads: uploads,
     isSyncing: syncQuery.isPending,
     isUploading: uploadFileMutation.isPending,

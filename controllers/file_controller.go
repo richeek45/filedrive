@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -19,12 +20,15 @@ import (
 	"github.com/richeek45/filedrive/dtos"
 	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
+	"github.com/wneessen/go-mail"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type FileController struct {
 	Repo       *repositories.FileRepository
 	FolderRepo *repositories.FolderRepository
+	UserRepo   *repositories.UserRepository
 	S3Client   *s3.Client
 	Bucket     string
 }
@@ -464,4 +468,108 @@ func (fc *FileController) SyncUserUploads(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "Sync complete"})
+}
+
+type ShareRequest struct {
+	FileID     uuid.UUID             `json:"fileId" binding:"required"`
+	FolderID   uuid.UUID             `json:"folderId"`
+	Emails     []string              `json:"emails" binding:"required"`
+	Permission models.PermissionType `json:"permission" binding:"required"`
+}
+
+func (fc *FileController) ShareFilesToUsersByEmails(c *gin.Context) {
+	var req ShareRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := uuid.MustParse(c.GetString("userID"))
+
+	fmt.Println(userID, req.FileID)
+
+	file, err := fc.Repo.GetFileByID(req.FileID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
+		return
+	}
+
+	var targetUsers []models.Users
+	if err := fc.UserRepo.DB.Where("email IN ?", req.Emails).Find(&targetUsers).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to look up users"})
+		return
+	}
+
+	if len(targetUsers) == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "No registered users found for these emails"})
+		return
+	}
+
+	var permissions []models.ResourcePermission
+	for _, user := range targetUsers {
+		permissions = append(permissions, models.ResourcePermission{
+			FileID:     &file.ID,
+			UserID:     user.ID,
+			FolderID:   &req.FolderID,
+			GrantedBy:  userID,
+			Permission: models.PermissionType(req.Permission),
+			CreatedAt:  time.Now(),
+		})
+	}
+
+	err = fc.Repo.DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "file_id"}, {Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"permission", "granted_by"}),
+	}).Create(&permissions).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update permissions"})
+		return
+	}
+
+	go fc.sendShareEmails(targetUsers, file.Name)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":         "File shared successfully",
+		"sharedWithCount": len(targetUsers),
+	})
+}
+
+func (fc *FileController) sendShareEmails(users []models.Users, fileName string) {
+	m := mail.NewMsg()
+	if err := m.From("richeek45@gmail.com"); err != nil {
+		fmt.Printf("failed to set from address: %v\n", err)
+		return
+	}
+
+	client, err := mail.NewClient("smtp.gmail.com",
+		mail.WithPort(587),
+		mail.WithSMTPAuth(mail.SMTPAuthPlain),
+		mail.WithUsername(os.Getenv("GMAIL_USER")),
+		mail.WithPassword(os.Getenv("GMAIL_APP_PASSWORD")),
+	)
+
+	if err != nil {
+		fmt.Printf("failed to create mail client: %v\n", err)
+		return
+	}
+
+	// Need to change the link to real link later
+	for _, user := range users {
+		m.To(user.Email)
+		m.Subject(fmt.Sprintf("A file has been shared with you: %s", fileName))
+		body := fmt.Sprintf(`
+			<h3>Hello %s,</h3>
+			<p>You have been granted access to <b>%s</b>.</p>
+			<p>Click the link below to view the file:</p>
+			<a href="https://yourdrive.com/dashboard/file/%s">View File</a>
+		`, user.FirstName, fileName, fileName)
+
+		m.SetBodyString(mail.TypeTextHTML, body)
+
+		if err := client.DialAndSend(m); err != nil {
+			fmt.Printf("failed to send email to %s: %v\n", user.Email, err)
+		}
+	}
+
 }
