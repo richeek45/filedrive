@@ -23,7 +23,7 @@ export const useFolders = (
 
   const foldersQuery = useQuery({
     // Important: Key must include parentId so TanStack treats each folder level as a unique cache
-    queryKey: ["folders", parentId],
+    queryKey: ["folders", parentId, isTrash],
     queryFn: () => fetchFolders(parentId, isTrash),
   });
 
@@ -35,7 +35,7 @@ export const useFolders = (
   });
 
   const filesQuery = useQuery({
-    queryKey: ["files", parentId],
+    queryKey: ["files", parentId, isTrash],
     queryFn: () => fetchFiles(parentId, isTrash),
     enabled: syncQuery.isSuccess || syncQuery.isError,
   });
@@ -65,7 +65,7 @@ export const useFolders = (
   const moveToTrash = useMutation({
     mutationFn: (fileId: string) => moveToTrashApi(fileId),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["files", parentId] }),
+      queryClient.invalidateQueries({ queryKey: ["files", parentId, isTrash] }),
   });
 
   const createFolderMutation = useMutation({
@@ -124,8 +124,10 @@ export const useFolders = (
         delete newUploads[file.name];
         return newUploads;
       });
-      queryClient.invalidateQueries({ queryKey: ["files", parentId] });
-      queryClient.invalidateQueries({ queryKey: ["folders", parentId] });
+      queryClient.invalidateQueries({ queryKey: ["files", parentId, isTrash] });
+      queryClient.invalidateQueries({
+        queryKey: ["folders", parentId, isTrash],
+      });
       queryClient.invalidateQueries({ queryKey: ["files", "sync"] });
       queryClient.invalidateQueries({ queryKey: ["authUser"] });
     },

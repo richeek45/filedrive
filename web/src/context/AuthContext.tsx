@@ -6,7 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 export interface User {
   id: string;
   email: string;
-  name?: string;
+  name: string;
+  lastName: string;
   picture?: string;
   storageUsed: number;
   storageLimit: number;

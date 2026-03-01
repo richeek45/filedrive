@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useUploadManager } from "../lib/uploadManager";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 interface FileItem {
   id: string;
@@ -463,6 +464,9 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isTrashView = pathname.includes("/trash");
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const { user } = useAuth();
 
   const {
     folders,
@@ -566,6 +570,8 @@ const Dashboard: React.FC = () => {
     );
   };
 
+  if (!user) return null;
+
   return (
     <div className="flex h-screen bg-white">
       <Sidebar
@@ -595,10 +601,74 @@ const Dashboard: React.FC = () => {
               {folderId ? "Folder View" : "My Drive"}
             </h1>
           </div>
+
+          <button
+            onClick={() => setIsProfileOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white overflow-hidden border border-gray-100">
+              {user?.picture ? (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                  // Optional: handle broken links
+                  onError={(e) => {
+                    e.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <span className="text-xs font-medium">
+                  {user?.name?.[0]}
+                  {user?.lastName?.[0]}
+                </span>
+              )}
+            </div>
+            <span className="font-medium text-gray-900">{user?.name}</span>
+          </button>
         </header>
 
         {renderContent()}
       </main>
+
+      {/* RIGHT DRAWER OVERLAY */}
+      {isProfileOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-25 z-40 transition-opacity"
+          onClick={() => setIsProfileOpen(false)}
+        />
+      )}
+
+      {/* RIGHT DRAWER PANEL */}
+      <aside
+        className={`
+        fixed right-0 top-0 h-full w-80 bg-white shadow-2xl z-50 
+        transform transition-transform duration-300 ease-in-out
+        ${isProfileOpen ? "translate-x-0" : "translate-x-full"}
+      `}
+      >
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-8">
+            <h2 className="text-xl font-bold">Profile Details</h2>
+            <button
+              onClick={() => setIsProfileOpen(false)}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            <div className="text-center">
+              <div className="w-24 h-24 bg-gray-200 rounded-full mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">{user?.name}</h3>
+              <p className="text-sm text-gray-500">{user?.email}</p>
+            </div>
+
+            <hr />
+          </div>
+        </div>
+      </aside>
 
       <NewFolderModal
         isOpen={isModalOpen}

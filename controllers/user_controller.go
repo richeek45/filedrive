@@ -61,6 +61,7 @@ func (r *UserController) GetProfile(c *gin.Context) {
 		"status":       "success",
 		"email":        user.Email,
 		"name":         user.FirstName,
+		"lastName":     user.LastName,
 		"picture":      user.Picture,
 		"storageUsed":  user.StorageUsed,
 		"storageLimit": user.StorageLimit,
