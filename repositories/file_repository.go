@@ -1,10 +1,14 @@
 package repositories
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
+	"github.com/richeek45/filedrive/dtos"
 	"github.com/richeek45/filedrive/models"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -14,11 +18,32 @@ type FileRepository struct {
 	DB *gorm.DB
 }
 
+func NewFileRepository(db *gorm.DB) *FileRepository {
+	return &FileRepository{DB: db}
+}
+
 func (r *FileRepository) GetFileByID(fileId uuid.UUID, userId uuid.UUID) (models.File, error) {
 	var file models.File
 	query := r.DB.Where("owner_id = ? AND id = ? AND is_deleted = false", userId, fileId)
 	err := query.First(&file).Error
 	return file, err
+}
+
+func (r *FileRepository) SharedFilesByUserID(userID uuid.UUID) ([]dtos.SharedFileResponse, error) {
+	var files []dtos.SharedFileResponse
+
+	err := r.DB.Table("file").
+		Select("file.*, resource_permission.permission, users.first_name as shared_by").
+		Joins("JOIN resource_permission ON resource_permission.file_id = file.id").
+		Joins("JOIN users ON resource_permission.granted_by = users.id").
+		Where("resource_permission.user_id = ? ", userID).
+		Scan(&files).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return files, nil
 }
 
 func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) error {
@@ -39,14 +64,21 @@ func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) erro
 	})
 }
 
-func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID) error {
+func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID, S3Client *s3.Client) error {
 	var file models.File
-	err := r.DB.Where("id = ? AND owner_id = ? AND is_deleted = true", fileId, userId).Delete(file).Error
-	return err
-}
+	err := r.DB.Where("id = ? AND owner_id = ? AND is_deleted = true", fileId, userId).First(&file).Error
+	if err != nil {
+		return err
+	}
 
-func NewFileRepository(db *gorm.DB) *FileRepository {
-	return &FileRepository{DB: db}
+	_, err = S3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+		Bucket: aws.String(file.BucketName),
+		Key:    aws.String(file.ObjectKey),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to delete S3 object: %w", err)
+	}
+	return r.DB.Unscoped().Delete(&file).Error
 }
 
 func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID, isTrash bool) ([]models.File, error) {

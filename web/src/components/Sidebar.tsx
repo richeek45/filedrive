@@ -3,6 +3,7 @@ import {
   Menu,
   Home,
   Computer,
+  Share2,
   Clock,
   Star,
   Trash2,
@@ -42,7 +43,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { icon: Home, label: "Home", path: "/dashboard" },
-    { icon: Computer, label: "My Drive", path: "/dashboard" }, // Can point to root folder
+    { icon: Computer, label: "My Drive", path: "/dashboard" },
+    { icon: Share2, label: "Shared With Me", path: "/dashboard/shared" },
     { icon: Clock, label: "Recent", path: "/dashboard/recent" },
     { icon: Star, label: "Starred", path: "/dashboard/starred" },
     { icon: Trash2, label: "Trash", path: "/dashboard/trash" },

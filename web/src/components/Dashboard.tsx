@@ -44,7 +44,6 @@ const ShareModal = ({ isOpen, onClose, shareFile, itemName, file }: any) => {
   if (!isOpen) return null;
 
   const handleShareFile = async () => {
-    console.log("Shared with:", email);
     await shareFile({
       fileId: file.id,
       folderId: file.parentId,
@@ -314,8 +313,6 @@ export const FileItem = ({
     // Try to get the file from IndexedDB first
     let file = await getPersistentFile(fileData.id);
 
-    console.log({ ...file, type: fileData.mimeType }, "file");
-
     // Fallback: If handle is missing, ask user to re-select
     if (!file) {
       const [handle] = await window.showOpenFilePicker({
@@ -464,6 +461,7 @@ const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isTrashView = pathname.includes("/trash");
+  const sharedWithMeView = pathname.includes("/shared");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const { user } = useAuth();
@@ -481,7 +479,7 @@ const Dashboard: React.FC = () => {
     isCreating,
     isLoading,
     activeUploads,
-  } = useFolders(folderId || null, isTrashView);
+  } = useFolders(folderId || null, isTrashView, sharedWithMeView);
 
   const handleNewFolder = (name: string) => {
     if (isCreating) return;

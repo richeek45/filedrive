@@ -9,22 +9,32 @@ import {
   syncPendingFileUploads,
   renameFolderApi,
   shareFilesApi,
+  fetchSharedFiles,
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const useFolders = (
   parentId: string | null = null,
   isTrash: boolean = false,
+  isShared: boolean = false,
 ) => {
   const [uploads, setUploads] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    queryClient.removeQueries({ queryKey: ["files"] });
+    queryClient.removeQueries({ queryKey: ["folders"] });
+    queryClient.resetQueries({ queryKey: ["files"] });
+    queryClient.resetQueries({ queryKey: ["folders"] });
+  }, [isShared, queryClient]);
 
   const foldersQuery = useQuery({
     // Important: Key must include parentId so TanStack treats each folder level as a unique cache
     queryKey: ["folders", parentId, isTrash],
     queryFn: () => fetchFolders(parentId, isTrash),
+    enabled: !isShared,
   });
 
   const syncQuery = useQuery({
@@ -35,9 +45,17 @@ export const useFolders = (
   });
 
   const filesQuery = useQuery({
-    queryKey: ["files", parentId, isTrash],
-    queryFn: () => fetchFiles(parentId, isTrash),
-    enabled: syncQuery.isSuccess || syncQuery.isError,
+    queryKey: ["files", parentId, isTrash, isShared],
+    queryFn: () => fetchFiles(parentId, isTrash, isShared),
+    enabled: (syncQuery.isSuccess || syncQuery.isError) && !isShared,
+  });
+
+  const sharedFilesQuery = useQuery({
+    queryKey: [""],
+    queryFn: async () => await fetchSharedFiles(),
+    staleTime: 60000,
+    refetchOnWindowFocus: true,
+    enabled: isShared,
   });
 
   const downloadFile = useMutation({
@@ -152,9 +170,13 @@ export const useFolders = (
     },
   });
 
+  const files = filesQuery.data ?? [];
+  const sharedFiles = sharedFilesQuery.data ?? [];
+  const renderFiles = isShared ? sharedFiles : files;
+
   return {
     folders: foldersQuery.data ?? [],
-    files: filesQuery.data ?? [],
+    files: renderFiles,
     moveToTrash: moveToTrash.mutate,
     downloadFile: downloadFile.mutate,
     renameFile: renameFile.mutate,

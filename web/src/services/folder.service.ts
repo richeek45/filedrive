@@ -49,12 +49,18 @@ export const fetchFolders = async (
   return res.data;
 };
 
+export const fetchSharedFiles = async (): Promise<File[]> => {
+  const res = await api.get("/files/shared-by");
+  return res.data;
+};
+
 export const fetchFiles = async (
   parentId: string | null = null,
   isTrash: boolean,
+  isShared: boolean,
 ): Promise<File[]> => {
   const res = await api.get("/files/", {
-    params: parentId ? { parentId, isTrash } : { isTrash },
+    params: parentId ? { parentId, isTrash } : { isTrash, isShared },
   });
 
   return res.data;

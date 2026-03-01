@@ -3,6 +3,7 @@ package controllers
 import (
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -556,4 +557,34 @@ func (fc *FileController) sendShareEmails(users []models.Users, fileName string)
 		}
 	}
 
+}
+
+func (fc *FileController) SharedWithUserFiles(c *gin.Context) {
+	userID := uuid.MustParse(c.GetString("userID"))
+
+	files, err := fc.Repo.SharedFilesByUserID(userID)
+	if err != nil {
+		log.Println("Error: ", err.Error())
+		c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
+	}
+
+	var response []dtos.SharedFileResponse
+
+	for _, f := range files {
+
+		response = append(response, dtos.SharedFileResponse{
+			FileResponse: dtos.FileResponse{
+				ID:        f.ID,
+				Name:      f.Name,
+				Size:      f.Size,
+				MimeType:  f.MimeType,
+				CreatedAt: f.CreatedAt,
+				IsDeleted: f.IsDeleted,
+			},
+			Permission: f.Permission,
+			SharedBy:   f.SharedBy,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }

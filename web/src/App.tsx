@@ -25,6 +25,14 @@ function App() {
               }
             />
             <Route
+              path="/dashboard/shared/:folderId?"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/dashboard/:folderId?"
               element={
                 <ProtectedRoute>

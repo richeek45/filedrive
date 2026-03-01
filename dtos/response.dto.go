@@ -22,3 +22,9 @@ type FolderResponse struct {
 	CreatedAt time.Time `json:"createdAt"`
 	IsDeleted bool      `json:"isDeleted"`
 }
+
+type SharedFileResponse struct {
+	FileResponse
+	Permission string `json:"permission"`
+	SharedBy   string `json:"sharedBy"`
+}
