@@ -1,0 +1,35 @@
+name: Deploy Backend to GCP
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to GCP VM via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            # Navigate to app directory or clone if it doesn't exist
+            [ -d "~/app" ] || git clone https://github.com/${{ github.repository }}.git ~/app
+            cd ~/app
+
+            # Pull latest changes
+            git pull origin main
+
+            # Recreate secrets from GitHub Secrets
+            echo "${{ secrets.ENV_FILE }}" > .env
+            # echo "${{ secrets.GCP_SA_JSON }}" > gcp-service-account.json
+
+            # Restart containers with the new code
+            sudo docker-compose down
+            sudo docker-compose up -d --build
