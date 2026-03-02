@@ -66,9 +66,13 @@ func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) erro
 
 func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID, S3Client *s3.Client) error {
 	var file models.File
-	err := r.DB.Where("id = ? AND owner_id = ? AND is_deleted = true", fileId, userId).First(&file).Error
+
+	err := r.DB.Table("files").
+		Where("id = ? AND owner_id = ?", fileId, userId).
+		First(&file).Error
+
 	if err != nil {
-		return err
+		return fmt.Errorf("lookup failed: %w", err)
 	}
 
 	_, err = S3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
@@ -76,9 +80,10 @@ func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID, S3Client
 		Key:    aws.String(file.ObjectKey),
 	})
 	if err != nil {
-		return fmt.Errorf("failed to delete S3 object: %w", err)
+		return fmt.Errorf("S3 delete failed: %w", err)
 	}
-	return r.DB.Unscoped().Delete(&file).Error
+
+	return r.DB.Unscoped().Table("files").Where("id = ?", file.ID).Delete(nil).Error
 }
 
 func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID, isTrash bool) ([]models.File, error) {

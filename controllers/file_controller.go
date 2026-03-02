@@ -547,8 +547,8 @@ func (fc *FileController) sendShareEmails(users []models.Users, fileName string)
 			<h3>Hello %s,</h3>
 			<p>You have been granted access to <b>%s</b>.</p>
 			<p>Click the link below to view the file:</p>
-			<a href="https://yourdrive.com/dashboard/file/%s">View File</a>
-		`, user.FirstName, fileName, fileName)
+			<a href="%s/dashboard/shared">View File</a>
+		`, user.FirstName, fileName, os.Getenv("FRONTEND_URL"))
 
 		m.SetBodyString(mail.TypeTextHTML, body)
 
