@@ -10,6 +10,7 @@ export const api = axios.create({
 });
 
 // REQUEST Interceptor: Add the token to every call
+
 api.interceptors.request.use(
   async (config) => {
     // Optional: Auto-refresh if expired before even sending the request
