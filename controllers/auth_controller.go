@@ -64,6 +64,7 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 
 func (r *AuthController) GoogleCallback(c *gin.Context) {
 	frontendURL := os.Getenv("FRONTEND_URL")
+	fmt.Println(frontendURL, " - frontendURL")
 	state := c.Query("state")
 	cookieState, _ := c.Cookie("oauth_state")
 
