@@ -67,8 +67,8 @@ func main() {
 	var allowedOrigins []string
 	if env == "production" {
 		allowedOrigins = []string{
-			"https://your-app.pages.dev",
-			"https://your-custom-domain.com",
+			"https://filedrive-ctx.pages.dev",
+			"https://34.101.234.31.sslip.io",
 		}
 	} else {
 		allowedOrigins = []string{os.Getenv("FRONTEND_URL")}
@@ -78,6 +78,7 @@ func main() {
 
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
+	router.SetTrustedProxies(nil)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})

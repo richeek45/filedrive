@@ -51,13 +51,12 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 	isProd := os.Getenv("GO_ENV") == "production"
 
 	// Determine domain (use "" to default to current host)
-	domain := os.Getenv("BACKEND_DOMAIN")
+	domain := ""
 	if !isProd {
 		domain = "localhost"
 	}
 
-	fmt.Println(isProd, domain)
-
+	c.SetSameSite(http.SameSiteNoneMode)
 	state := r.generateStateOauthCookie()
 	c.SetCookie("oauth_state", state, 3600, "/", domain, isProd, true)
 	url := r.oauthConfig.AuthCodeURL(state)
