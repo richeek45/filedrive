@@ -28,7 +28,7 @@ export const useFolders = (
     queryClient.removeQueries({ queryKey: ["folders"] });
     queryClient.resetQueries({ queryKey: ["files"] });
     queryClient.resetQueries({ queryKey: ["folders"] });
-  }, [isShared, queryClient]);
+  }, [isShared, isTrash, queryClient]);
 
   const foldersQuery = useQuery({
     // Important: Key must include parentId so TanStack treats each folder level as a unique cache
@@ -82,8 +82,10 @@ export const useFolders = (
 
   const moveToTrash = useMutation({
     mutationFn: (fileId: string) => moveToTrashApi(fileId),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["files", parentId, isTrash] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files", parentId, isTrash] });
+      queryClient.invalidateQueries({ queryKey: ["authUser"] });
+    },
   });
 
   const createFolderMutation = useMutation({

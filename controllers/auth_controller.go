@@ -52,11 +52,14 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 
 	// Determine domain (use "" to default to current host)
 	domain := ""
-	if !isProd {
+
+	if isProd {
+		c.SetSameSite(http.SameSiteNoneMode)
+	} else {
 		domain = "localhost"
+		c.SetSameSite(http.SameSiteLaxMode)
 	}
 
-	c.SetSameSite(http.SameSiteNoneMode)
 	state := r.generateStateOauthCookie()
 	c.SetCookie("oauth_state", state, 3600, "/", domain, isProd, true)
 	url := r.oauthConfig.AuthCodeURL(state)
@@ -65,7 +68,6 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 
 func (r *AuthController) GoogleCallback(c *gin.Context) {
 	frontendURL := os.Getenv("FRONTEND_URL")
-	fmt.Println(frontendURL, " - frontendURL")
 	state := c.Query("state")
 	cookieState, _ := c.Cookie("oauth_state")
 

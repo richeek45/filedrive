@@ -151,7 +151,7 @@ func (fc *FileController) MoveToTrash(c *gin.Context) {
 	}
 
 	userId := uuid.MustParse(c.GetString("userID"))
-	if err := fc.Repo.SoftDeleteFile(fileId, userId); err != nil {
+	if err := fc.Repo.DeleteFile(fileId, userId, fc.S3Client); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete file"})
 		return
 	}

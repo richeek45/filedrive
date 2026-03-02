@@ -45,8 +45,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (!response.ok) throw new Error("Failed to fetch user profile");
       return (await response.json()) as User;
     },
-    staleTime: Infinity,
-    retry: false,
+    staleTime: 60000,
+    // retry: false,
   });
 
   const login = (): void => {

@@ -46,44 +46,49 @@ func (r *FileRepository) SharedFilesByUserID(userID uuid.UUID) ([]dtos.SharedFil
 	return files, nil
 }
 
-func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) error {
-	return r.DB.Transaction(func(tx *gorm.DB) error {
-		var file models.File
-		if err := tx.Where("id = ? AND owner_id = ?", fileID, userID).First(&file).Error; err != nil {
-			return err
-		}
+func (r *FileRepository) DeleteFile(fileID uuid.UUID, userID uuid.UUID, S3Client *s3.Client) error {
+	var file models.File
 
-		if err := tx.Model(&file).Updates(map[string]interface{}{
+	err := r.DB.Unscoped().Where("id = ? AND owner_id = ?", fileID, userID).First(&file).Error
+	if err != nil {
+		return fmt.Errorf("file not found: %w", err)
+	}
+
+	if file.IsDeleted {
+		return r.PermanentDeleteFile(&file, S3Client)
+	}
+
+	return r.SoftDeleteFile(&file)
+}
+
+func (r *FileRepository) SoftDeleteFile(file *models.File) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(file).Updates(map[string]interface{}{
 			"is_deleted": true,
 			"deleted_at": time.Now(),
 		}).Error; err != nil {
 			return err
 		}
-		return tx.Model(&models.Users{}).Where("id = ?", file.OwnerID).
-			UpdateColumn("storage_used", gorm.Expr("storage_used - ?", file.Size)).Error
+		return nil
 	})
 }
 
-func (r *FileRepository) DeleteFile(fileId uuid.UUID, userId uuid.UUID, S3Client *s3.Client) error {
-	var file models.File
-
-	err := r.DB.Table("files").
-		Where("id = ? AND owner_id = ?", fileId, userId).
-		First(&file).Error
-
-	if err != nil {
-		return fmt.Errorf("lookup failed: %w", err)
-	}
-
-	_, err = S3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
+func (r *FileRepository) PermanentDeleteFile(file *models.File, S3Client *s3.Client) error {
+	_, err := S3Client.DeleteObject(context.TODO(), &s3.DeleteObjectInput{
 		Bucket: aws.String(file.BucketName),
 		Key:    aws.String(file.ObjectKey),
 	})
 	if err != nil {
-		return fmt.Errorf("S3 delete failed: %w", err)
+		return fmt.Errorf("failed to delete from S3: %w", err)
 	}
 
-	return r.DB.Unscoped().Table("files").Where("id = ?", file.ID).Delete(nil).Error
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Unscoped().Delete(file).Error; err != nil {
+			return fmt.Errorf("failed to purge from DB: %w", err)
+		}
+		return tx.Model(&models.Users{}).Where("id = ?", file.OwnerID).
+			UpdateColumn("storage_used", gorm.Expr("storage_used - ?", file.Size)).Error
+	})
 }
 
 func (r *FileRepository) GetFiles(userId uuid.UUID, folderID *uuid.UUID, isTrash bool) ([]models.File, error) {

@@ -50,7 +50,7 @@ func main() {
 	}
 
 	cronJob := cron.New(cron.WithSeconds())
-	cronJob.AddFunc("0 0 0 * * *", func() {
+	cronJob.AddFunc("0 0 * * * *", func() {
 		log.Println("--- Starting Storage Sync Job ---")
 
 		err := worker.SyncUserStorage(db)
