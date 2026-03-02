@@ -49,7 +49,7 @@ func (r *FileRepository) SharedFilesByUserID(userID uuid.UUID) ([]dtos.SharedFil
 func (r *FileRepository) SoftDeleteFile(fileID uuid.UUID, userID uuid.UUID) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		var file models.File
-		if err := tx.Where("id = ? AND owner_id = ?", fileID, userID).Error; err != nil {
+		if err := tx.Where("id = ? AND owner_id = ?", fileID, userID).First(&file).Error; err != nil {
 			return err
 		}
 
