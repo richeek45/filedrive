@@ -56,6 +56,8 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 		domain = "localhost"
 	}
 
+	fmt.Println(isProd, domain)
+
 	state := r.generateStateOauthCookie()
 	c.SetCookie("oauth_state", state, 3600, "/", domain, isProd, true)
 	url := r.oauthConfig.AuthCodeURL(state)
