@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -47,18 +48,27 @@ func (r *AuthController) generateStateOauthCookie() string {
 
 // GoogleLogin redirects to Google's OAuth2 consent page
 func (r *AuthController) GoogleLogin(c *gin.Context) {
+	isProd := os.Getenv("GO_ENV") == "production"
+
+	// Determine domain (use "" to default to current host)
+	domain := ""
+	if !isProd {
+		domain = "localhost"
+	}
+
 	state := r.generateStateOauthCookie()
-	c.SetCookie("oauth_state", state, 3600, "/", "localhost", false, true)
+	c.SetCookie("oauth_state", state, 3600, "/", domain, isProd, true)
 	url := r.oauthConfig.AuthCodeURL(state)
 	c.Redirect(http.StatusTemporaryRedirect, url)
 }
 
 func (r *AuthController) GoogleCallback(c *gin.Context) {
+	frontendURL := os.Getenv("FRONTEND_URL")
 	state := c.Query("state")
 	cookieState, _ := c.Cookie("oauth_state")
 
 	if state != cookieState {
-		c.Redirect(http.StatusTemporaryRedirect, "http://localhost:5173/login?error=invalid_state")
+		c.Redirect(http.StatusTemporaryRedirect, fmt.Sprintf("%s/login?error=invalid_state", frontendURL))
 		return
 	}
 
@@ -96,7 +106,6 @@ func (r *AuthController) GoogleCallback(c *gin.Context) {
 		return
 	}
 
-	frontendURL := os.Getenv("FRONTEND_URL")
 	redirectURL := frontendURL + "/oauth-callback?access_token=" + tokens.AccessToken +
 		"&refresh_token=" + tokens.RefreshToken +
 		"&expires_in=" + string(rune(tokens.ExpiresIn))
