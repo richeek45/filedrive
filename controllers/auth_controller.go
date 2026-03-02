@@ -51,7 +51,7 @@ func (r *AuthController) GoogleLogin(c *gin.Context) {
 	isProd := os.Getenv("GO_ENV") == "production"
 
 	// Determine domain (use "" to default to current host)
-	domain := ""
+	domain := os.Getenv("BACKEND_DOMAIN")
 	if !isProd {
 		domain = "localhost"
 	}
