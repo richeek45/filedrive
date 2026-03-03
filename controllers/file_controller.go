@@ -528,7 +528,8 @@ func (fc *FileController) sendShareEmails(users []models.Users, fileName string)
 	}
 
 	client, err := mail.NewClient("smtp.gmail.com",
-		mail.WithPort(587),
+		mail.WithPort(465),
+		mail.WithSSL(),
 		mail.WithSMTPAuth(mail.SMTPAuthPlain),
 		mail.WithUsername(os.Getenv("GMAIL_USER")),
 		mail.WithPassword(os.Getenv("GMAIL_APP_PASSWORD")),
