@@ -571,7 +571,7 @@ const Dashboard: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex w-[95%] h-screen bg-white">
       <Sidebar
         onNewFolder={() => setIsModalOpen(true)}
         onFileUpload={handleFileUpload}
