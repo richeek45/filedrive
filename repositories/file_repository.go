@@ -38,9 +38,10 @@ func (r *FileRepository) GetFileByID(fileId uuid.UUID, userId uuid.UUID) (models
 	var file models.File
 
 	query := r.DB.Table("file").Select("file.*").
-		Joins("LEFT JOIN resource_permission ON resource_permission.user_id = user.id AND file.id = resource_permissions.file_id").
-		Where("file.id = ? AND file.is_deleted = false", fileId).
-		Where("file.owner_id = ? OR resource_permissions.user_id = ?", userId, userId).
+		Joins("LEFT JOIN users ON users.id = ?", userId).
+		Joins("LEFT JOIN resource_permission ON resource_permission.user_id = users.id AND resource_permission.file_id = file.id").
+		Where("file.id = ? AND file.is_deleted = ?", fileId, false).
+		Where("file.owner_id = ? OR resource_permission.user_id = ?", userId, userId).
 		Group("file.id")
 
 	err := query.First(&file).Error

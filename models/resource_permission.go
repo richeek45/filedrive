@@ -27,8 +27,8 @@ func (self PermissionType) Value() (driver.Value, error) {
 type ResourcePermission struct {
 	ID uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 
-	FileID   *uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_file_user"`
-	FolderID *uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_folder_user"`
+	FileID   *uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_file_user,where:file_id IS NOT NULL"`
+	FolderID *uuid.UUID `gorm:"type:uuid;uniqueIndex:idx_folder_user,where:folder_id IS NOT NULL"`
 
 	GrantedBy     uuid.UUID `gorm:"type:uuid;not null"`
 	GrantedByUser Users     `gorm:"foreignKey:GrantedBy"`

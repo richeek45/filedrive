@@ -492,14 +492,21 @@ func (fc *FileController) ShareFilesToUsersByEmails(c *gin.Context) {
 
 	var permissions []models.ResourcePermission
 	for _, user := range targetUsers {
-		permissions = append(permissions, models.ResourcePermission{
+		permission := models.ResourcePermission{
 			FileID:     &file.ID,
 			UserID:     user.ID,
 			FolderID:   &req.FolderID,
 			GrantedBy:  userID,
 			Permission: models.PermissionType(req.Permission),
 			CreatedAt:  time.Now(),
-		})
+		}
+
+		if req.FolderID != uuid.Nil {
+			permission.FolderID = &req.FolderID
+		} else {
+			permission.FolderID = nil
+		}
+		permissions = append(permissions, permission)
 	}
 
 	err = fc.Repo.DB.Clauses(clause.OnConflict{
