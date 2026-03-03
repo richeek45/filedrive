@@ -34,7 +34,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     queryKey: ["authUser"],
     queryFn: async () => {
       const token = authService.getAccessToken();
-      if (!token || authService.isTokenExpired()) {
+      if (!token) {
         return null;
       }
 
