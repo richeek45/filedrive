@@ -47,6 +47,7 @@ services:
       GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL}
       JWT_SECRET: ${JWT_SECRET}
       GMAIL_USER: ${GMAIL_USER}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
       # GOOGLE_APPLICATION_CREDENTIALS: /app/sa.json # for local
     depends_on:
       postgres:
