@@ -22,11 +22,33 @@ func NewFileRepository(db *gorm.DB) *FileRepository {
 	return &FileRepository{DB: db}
 }
 
+/*
+SELECT f.*
+FROM files f
+LEFT JOIN resource_permissions rp
+    ON f.id = rp.file_id AND rp.user_id = 'user-id-here'
+WHERE f.id = 'file-id-here'
+    AND f.is_deleted = false
+    AND (f.owner_id = 'user-id-here' OR rp.user_id = 'user-id-here')
+GROUP BY f.id;
+
+*/
+
 func (r *FileRepository) GetFileByID(fileId uuid.UUID, userId uuid.UUID) (models.File, error) {
 	var file models.File
-	query := r.DB.Where("owner_id = ? AND id = ? AND is_deleted = false", userId, fileId)
+
+	query := r.DB.Table("file").Select("file.*").
+		Joins("LEFT JOIN resource_permission ON resource_permission.user_id = user.id AND files.id = resource_permissions.file_id").
+		Where("files.id = ? AND files.is_deleted = false", fileId).
+		Where("files.owner_id = ? OR resource_permissions.user_id = ?", userId, userId).
+		Group("files.id")
+
 	err := query.First(&file).Error
-	return file, err
+	if err != nil {
+		return models.File{}, err
+	}
+
+	return file, nil
 }
 
 func (r *FileRepository) SharedFilesByUserID(userID uuid.UUID) ([]dtos.SharedFileResponse, error) {
