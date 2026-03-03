@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/richeek45/filedrive/models"
 	"github.com/richeek45/filedrive/repositories"
 	"golang.org/x/oauth2"
@@ -133,7 +133,7 @@ func (r *AuthController) getUserInfo(accessToken string) (map[string]interface{}
 }
 
 func (r *AuthController) generateTokens(user *models.Users) (*models.TokenDetails, error) {
-	accessTokenExpiry := time.Now().Add(time.Hour * 3) // 1 hour
+	accessTokenExpiry := time.Now().Add(time.Hour * 1)
 	accessClaims := &models.Claims{
 		UserID: user.ID.String(),
 		Email:  user.Email,
@@ -206,20 +206,13 @@ func (r *AuthController) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	id64, err := strconv.ParseUint(claims.UserID, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user ID format in token"})
-		return
-	}
-	uintID := uint(id64)
-
+	userID := uuid.MustParse(claims.UserID)
 	var user models.Users
-	err = r.Repo.DB.First(&user, uintID).Error
+	err = r.Repo.DB.First(&user, userID).Error
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User Not Found"})
 	}
 
-	// Generate new tokens
 	tokens, err := r.generateTokens(&user)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
