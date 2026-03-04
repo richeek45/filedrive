@@ -29,6 +29,8 @@ jobs:
             # Recreate secrets from GitHub Secrets
             echo "${{ secrets.ENV_FILE }}" > .env
             # echo "${{ secrets.GCP_SA_JSON }}" > gcp-service-account.json
+            export BACKEND_IP=$(curl -s -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip)
+            echo "Detected Internal IP: $BACKEND_IP"
 
             # Restart containers with the new code
             sudo docker compose down

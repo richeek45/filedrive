@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "filedrive-backend"
+    static_configs:
+      # Replace 'host.docker.internal' with your actual local IP
+      # or service name if the Go app is also in Docker.
+      - targets: ["backend_host:8000"]

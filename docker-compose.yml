@@ -48,8 +48,11 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       GMAIL_USER: ${GMAIL_USER}
       GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD}
+      OTEL_EXPORTER_OTLP_ENDPOINT: "jaeger:4317"
       # GOOGLE_APPLICATION_CREDENTIALS: /app/sa.json # for local
     depends_on:
+      jaeger:
+        condition: service_started
       postgres:
         condition: service_healthy
     networks:
@@ -75,6 +78,32 @@ services:
     networks:
       - app-network
 
+  # Jaeger: The Tracing Backend
+  jaeger:
+    image: jaegertracing/all-in-one:1.51
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - app-network
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4317:4317" # OTLP gRPC (Where Go sends traces)
+      - "4318:4318" # OTLP HTTP
+
+  # Prometheus: The Metrics Store
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    extra_hosts:
+      # This maps the name "backend_host" to whatever IP you provide.
+      # If BACKEND_IP is empty, it defaults to host.docker.internal.
+      - "backend_host:${BACKEND_IP:-host-gateway}"
+    networks:
+      - app-network
+    ports:
+      - "9090:9090"
 volumes:
   postgres_data:
 

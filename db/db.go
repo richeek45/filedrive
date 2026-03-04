@@ -2,9 +2,11 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"github.com/richeek45/filedrive/models"
+	"github.com/uptrace/opentelemetry-go-extra/otelgorm"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
@@ -40,6 +42,10 @@ func InitDB() *gorm.DB {
 	err = db.AutoMigrate(&models.Users{}, &models.File{}, &models.Folder{}, &models.ResourcePermission{}, &models.PendingUpload{})
 	if err != nil {
 		panic("failed to migrate database: " + err.Error())
+	}
+
+	if err := db.Use(otelgorm.NewPlugin()); err != nil {
+		log.Printf("Failed to instrument GORM: %v", err)
 	}
 
 	fmt.Println("Connected to database!", dsn)

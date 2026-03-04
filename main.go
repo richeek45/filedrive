@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,13 +9,23 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/richeek45/filedrive/controllers"
 	"github.com/richeek45/filedrive/db"
+	"github.com/richeek45/filedrive/middleware"
 	"github.com/richeek45/filedrive/repositories"
 	"github.com/richeek45/filedrive/routes"
 	"github.com/richeek45/filedrive/storage"
 	"github.com/richeek45/filedrive/worker"
 	"github.com/robfig/cron/v3"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 func loadEnv() {
@@ -35,6 +46,32 @@ func loadEnv() {
 			log.Fatalf("Required environment variable %s is not set", v)
 		}
 	}
+}
+
+func initTracer() (*sdktrace.TracerProvider, error) {
+	// Jaeger now supports OTLP natively on port 4317
+	endpoint := os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "127.0.0.1:4317" // Local fallback
+	}
+	exporter, err := otlptracegrpc.New(
+		context.Background(),
+		otlptracegrpc.WithInsecure(),
+		otlptracegrpc.WithEndpoint(endpoint),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("filedrive-backend"),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	return tp, nil
 }
 
 func main() {
@@ -79,6 +116,20 @@ func main() {
 	router.RedirectTrailingSlash = false
 	router.RedirectFixedPath = false
 	router.SetTrustedProxies(nil)
+
+	tp, _ := initTracer()
+	defer tp.Shutdown(context.Background())
+
+	router.Use(otelgin.Middleware("filedrive-backend"))
+
+	reg := prometheus.NewRegistry()
+	promHandler := promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	router.GET("/metrics", func(c *gin.Context) {
+		promHandler.ServeHTTP(c.Writer, c.Request)
+	})
+
+	router.Use(middleware.PrometheusMiddleware(reg))
+	router.Use(otelgin.Middleware("filedrive-backend"))
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{"message": "pong"})
