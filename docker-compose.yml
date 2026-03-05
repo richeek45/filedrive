@@ -62,6 +62,7 @@ services:
     volumes:
       # - ./gcp-service-account.json:/app/sa.json # for local
       - ./:/app # Mount entire root for development
+      - /go/pkg/mod # Prevents re-downloading modules if you restart
       - /app/tmp # Exclude temp folder if using air for hot-reload
 
   nginx:

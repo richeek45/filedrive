@@ -39,7 +39,15 @@ func InitDB() *gorm.DB {
 		END $$;
 	`)
 
-	err = db.AutoMigrate(&models.Users{}, &models.File{}, &models.Folder{}, &models.ResourcePermission{}, &models.PendingUpload{})
+	err = db.AutoMigrate(
+		&models.Users{},
+		&models.File{},
+		&models.Folder{},
+		&models.ResourcePermission{},
+		&models.PendingUpload{},
+		&models.DeletedFile{},
+		&models.FailedS3Deletion{},
+	)
 	if err != nil {
 		panic("failed to migrate database: " + err.Error())
 	}
