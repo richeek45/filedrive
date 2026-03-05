@@ -200,7 +200,7 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	limiter := NewIPRateLimiter(5, 10)
+	limiter := NewIPRateLimiter(5, 100)
 
 	api := router.Group("/api")
 	api.Use(RateLimitMiddleware(limiter))

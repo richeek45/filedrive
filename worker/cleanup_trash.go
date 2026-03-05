@@ -43,7 +43,7 @@ func PurgeExpiredDeletedFiles(db *gorm.DB, s3Client *s3.Client, bucketName strin
 				Where("is_deleted = ? AND deleted_at < ?", true, expiryDate).
 				Find(&filesToPurge).Error
 			if err != nil {
-				log.Fatalf("Failed to get deleted_at files: %w", err)
+				log.Fatalf("Failed to get deleted_at files: %v", err)
 				break
 			}
 
@@ -63,7 +63,7 @@ func PurgeExpiredDeletedFiles(db *gorm.DB, s3Client *s3.Client, bucketName strin
 			})
 
 			if err != nil {
-				log.Fatalf("S3 API error: %w", err)
+				log.Fatalf("S3 API error: %v", err)
 				break
 			}
 
