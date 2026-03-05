@@ -4,11 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"sync"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -72,6 +75,49 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	)
 	otel.SetTracerProvider(tp)
 	return tp, nil
+}
+
+type IPlimiter struct {
+	ips map[string]*rate.Limiter
+	mu  sync.Mutex
+	r   rate.Limit
+	b   int
+}
+
+func NewIPRateLimiter(r rate.Limit, b int) *IPlimiter {
+	return &IPlimiter{
+		ips: make(map[string]*rate.Limiter),
+		r:   r,
+		b:   b,
+	}
+}
+
+func (i *IPlimiter) GetLimiter(ip string) *rate.Limiter {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	limiter, exists := i.ips[ip]
+	if !exists {
+		limiter = rate.NewLimiter(i.r, i.b)
+		i.ips[ip] = limiter
+	}
+	return limiter
+}
+
+func RateLimitMiddleware(limiter *IPlimiter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Get the client's IP address
+		ip := c.ClientIP()
+		l := limiter.GetLimiter(ip)
+
+		if !l.Allow() {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+				"error": "Too many requests. Slow down!",
+			})
+			return
+		}
+		c.Next()
+	}
 }
 
 func main() {
@@ -143,7 +189,10 @@ func main() {
 		AllowCredentials: true,
 	}))
 
+	limiter := NewIPRateLimiter(5, 10)
+
 	api := router.Group("/api")
+	api.Use(RateLimitMiddleware(limiter))
 
 	userRepo := repositories.NewUserRepository(db)
 	userController := &controllers.UserController{Repo: userRepo}
