@@ -98,12 +98,13 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 	for _, f := range files {
 
 		response = append(response, dtos.FileResponse{
-			ID:        f.ID,
-			Name:      f.Name,
-			Size:      f.Size,
-			MimeType:  f.MimeType,
-			CreatedAt: f.CreatedAt,
-			IsDeleted: f.IsDeleted,
+			ID:           f.ID,
+			Name:         f.Name,
+			Size:         f.Size,
+			MimeType:     f.MimeType,
+			CreatedAt:    f.CreatedAt,
+			IsDeleted:    f.IsDeleted,
+			UploadStatus: f.UploadStatus,
 		})
 	}
 

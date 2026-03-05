@@ -9,7 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 func SyncUserStorage(db *gorm.DB) error {
 	log.Println("Starting storage synchronization...")
 
@@ -22,10 +21,10 @@ func SyncUserStorage(db *gorm.DB) error {
 		var userIDs []uuid.UUID
 
 		err := db.Model(&models.Users{}).
-		Limit(batchSize).
-		Offset(i).
-		Pluck("id", &userIDs).
-		Error
+			Limit(batchSize).
+			Offset(i).
+			Pluck("id", &userIDs).
+			Error
 
 		if err != nil {
 			log.Printf("Error fetching user batch: %v", err)
@@ -43,10 +42,10 @@ func SyncUserStorage(db *gorm.DB) error {
 			WHERE u.id IN ?`, userIDs).Error
 
 		if err != nil {
-            log.Printf("Transaction failed for batch at offset %d: %v", i, err)
-        } else {
-            log.Printf("Processed %d/%d users...", i+len(userIDs), totalUsers)
-        }
+			log.Printf("Transaction failed for batch at offset %d: %v", i, err)
+		} else {
+			log.Printf("Processed %d/%d users...", i+len(userIDs), totalUsers)
+		}
 
 		time.Sleep(50 * time.Millisecond)
 	}

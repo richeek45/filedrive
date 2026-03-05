@@ -133,7 +133,7 @@ func main() {
 	}
 
 	cronJob := cron.New(cron.WithSeconds())
-	cronJob.AddFunc("0 0 * * * *", func() {
+	cronJob.AddFunc("0 0 0 * * *", func() {
 		log.Println("--- Starting Storage Sync Job ---")
 
 		err := worker.SyncUserStorage(db)
@@ -141,6 +141,17 @@ func main() {
 		if err != nil {
 			log.Printf("Storage Sync failed %v", err)
 		}
+	})
+
+	cronJob.AddFunc("0 0 */6 * * *", func() {
+		log.Println("--- Starting S3 Orphaned Cleanup Job ---")
+		worker.CleanupOrphanedS3Objects(db, s3Client, bucketName)
+	})
+
+	// 0 * * * * * -> every minute for testing
+	cronJob.AddFunc("0 0 2 * * *", func() {
+		log.Println("--- Starting Daily Permanent Purge ---")
+		worker.PurgeExpiredDeletedFiles(db, s3Client, bucketName)
 	})
 
 	cronJob.Start()
