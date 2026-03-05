@@ -9,10 +9,12 @@ import {
   Trash,
   Share,
   Edit2,
+  RefreshCw,
 } from "lucide-react";
 import { useUploadManager } from "../lib/uploadManager";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ConfirmationModal } from "./ConfirmationModal";
 
 interface FileItem {
   id: string;
@@ -276,6 +278,7 @@ export const FileItem = ({
   uploadFile,
   renameFile,
   shareFile,
+  restoreFile,
 }: {
   file: any;
   downloadFile: (fileId: string) => void;
@@ -293,11 +296,14 @@ export const FileItem = ({
     emails: string[];
     permission: string;
   }) => void;
+  restoreFile: ({ fileId }: { fileId: string }) => void;
 }) => {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isRenameOpen, setIsRenameOpen] = useState(false);
 
   const [showMenu, setShowMenu] = useState(false);
+  const isDeleted =
+    file.deletedAt || window.location.pathname.includes("/trash");
   const isPaused = file.uploadStatus === "paused";
   const isUploading =
     file.uploadStatus === "pending" || file.uploadStatus === "uploading";
@@ -343,6 +349,13 @@ export const FileItem = ({
   const handleRenameSubmit = (newName: string) => {
     console.log(`Renaming ${file.id} to ${newName}`);
     renameFile({ name: newName, id: file.id });
+  };
+
+  const handleMoveToTrash = (fileId: string) => {
+    console.log(file);
+    if (file.permission === "owner") {
+      moveToTrash(fileId);
+    }
   };
 
   return (
@@ -431,8 +444,18 @@ export const FileItem = ({
                   icon={<Trash size={16} />}
                   label="Move to Trash"
                   danger
-                  onClick={() => moveToTrash(file.id)}
+                  onClick={() => handleMoveToTrash(file.id)}
                 />
+                {isDeleted && (
+                  <MenuOption
+                    icon={<RefreshCw size={16} />}
+                    label="Restore File"
+                    onClick={() => {
+                      restoreFile({ fileId: file.id });
+                      setShowMenu(false);
+                    }}
+                  />
+                )}
               </div>
             </>
           )}
@@ -463,8 +486,9 @@ const Dashboard: React.FC = () => {
   const isTrashView = pathname.includes("/trash");
   const sharedWithMeView = pathname.includes("/shared");
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isBulkRestoreOpen, setIsBulkRestoreOpen] = useState(false);
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const {
     folders,
@@ -475,6 +499,8 @@ const Dashboard: React.FC = () => {
     uploadFile,
     renameFile,
     renameFolder,
+    restoreFileById,
+    restoreDeletedFiles,
     shareFile,
     isCreating,
     isLoading,
@@ -548,6 +574,7 @@ const Dashboard: React.FC = () => {
             moveToTrash={moveToTrash}
             uploadFile={uploadFile}
             shareFile={shareFile}
+            restoreFile={restoreFileById}
           />
         ))}
         {Object.entries(activeUploads).map(([fileName, progress]) => (
@@ -664,9 +691,45 @@ const Dashboard: React.FC = () => {
             </div>
 
             <hr />
+
+            {/* NEW: Restore All Section */}
+            <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
+              <h4 className="text-sm font-semibold text-orange-800 mb-2">
+                Trash Management
+              </h4>
+              <p className="text-xs text-orange-600 mb-4">
+                Accidentally cleared your trash? You can restore all permanently
+                deleted files here.
+              </p>
+              <button
+                onClick={() => setIsBulkRestoreOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
+              >
+                <RefreshCw size={16} />
+                Restore All Files
+              </button>
+            </div>
           </div>
+
+          <button
+            className="mt-auto w-full py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium"
+            onClick={logout}
+          >
+            Sign Out
+          </button>
         </div>
       </aside>
+
+      {/* Global Restore Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isBulkRestoreOpen}
+        onClose={() => setIsBulkRestoreOpen(false)}
+        onConfirm={restoreDeletedFiles}
+        title="Restore All Files?"
+        description="This will recover all permanently deleted files and move them back to your drive. This action cannot be undone."
+        confirmLabel="Restore Everything"
+        variant="warning"
+      />
 
       <NewFolderModal
         isOpen={isModalOpen}

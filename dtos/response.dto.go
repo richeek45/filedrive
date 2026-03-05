@@ -14,6 +14,7 @@ type FileResponse struct {
 	CreatedAt    time.Time `json:"createdAt"`
 	IsDeleted    bool      `json:"isDeleted"`
 	UploadStatus string    `json:"uploadStatus"`
+	Permission   string    `json:"permission"`
 }
 
 type FolderResponse struct {

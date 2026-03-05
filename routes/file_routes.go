@@ -17,6 +17,8 @@ func FileRoutes(api *gin.RouterGroup, fileController *controllers.FileController
 		fileApi.PATCH("/:fileId/trash", fileController.MoveToTrash)
 		fileApi.GET("/sync-active-uploads", fileController.SyncUserUploads)
 		fileApi.POST("/share", fileController.ShareFilesToUsersByEmails)
+		fileApi.POST("/restore-file", fileController.RestoreFileById)
+		fileApi.POST("/restore-deleted-files", fileController.RestorePermanentlyDeletedFiles)
 	}
 
 	uploadApi := fileApi.Group("/uploads")

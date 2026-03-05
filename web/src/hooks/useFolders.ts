@@ -10,6 +10,8 @@ import {
   renameFolderApi,
   shareFilesApi,
   fetchSharedFiles,
+  restoreAllDeletedFilesApi,
+  restoreFileApi,
 } from "../services/folder.service";
 import type { Folder } from "../services/folder.service";
 import { uploadFileInParts } from "../lib/upload";
@@ -172,6 +174,22 @@ export const useFolders = (
     },
   });
 
+  const restoreFileMutation = useMutation({
+    mutationFn: (payload: { fileId: string }) => restoreFileApi(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["deleted-files"] });
+    },
+  });
+
+  const restoreAllDeletedFilesMutation = useMutation({
+    mutationFn: restoreAllDeletedFilesApi,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["files"] });
+      queryClient.invalidateQueries({ queryKey: ["deleted-files"] });
+    },
+  });
+
   const files = filesQuery.data ?? [];
   const sharedFiles = sharedFilesQuery.data ?? [];
   const renderFiles = isShared ? sharedFiles : files;
@@ -181,6 +199,8 @@ export const useFolders = (
     files: renderFiles,
     moveToTrash: moveToTrash.mutate,
     downloadFile: downloadFile.mutate,
+    restoreFileById: restoreFileMutation.mutate,
+    restoreDeletedFiles: restoreAllDeletedFilesMutation.mutate,
     renameFile: renameFile.mutate,
     renameFolder: renameFolder.mutate,
     isLoading: foldersQuery.isLoading,

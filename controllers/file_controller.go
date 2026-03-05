@@ -105,6 +105,7 @@ func (fc *FileController) GetFilesFromParentFolder(c *gin.Context) {
 			CreatedAt:    f.CreatedAt,
 			IsDeleted:    f.IsDeleted,
 			UploadStatus: f.UploadStatus,
+			Permission:   "owner",
 		})
 	}
 
@@ -153,10 +154,42 @@ func (fc *FileController) MoveToTrash(c *gin.Context) {
 
 	userId := uuid.MustParse(c.GetString("userID"))
 	if err := fc.Repo.DeleteFile(fileId, userId, fc.S3Client); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not delete file"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "File moved to trash"})
+}
+
+func (fc *FileController) RestoreFileById(c *gin.Context) {
+	var req struct {
+		FileID uuid.UUID `json:"fileId" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fmt.Printf("Error in restorinng file: %s, %v", req.FileID, err.Error())
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userID := uuid.MustParse(c.GetString("userID"))
+	err := fc.Repo.RestoreFileById(req.FileID, userID, fc.S3Client)
+	if err != nil {
+		fmt.Printf("Error in restorinng file: %s, %v", req.FileID, err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "restored successfully"})
+}
+
+// It only restores if the file is deleted in the last 30 days
+func (fc *FileController) RestorePermanentlyDeletedFiles(c *gin.Context) {
+	userID := uuid.MustParse(c.GetString("userID"))
+	err := fc.Repo.RestoreDeletedFiles(userID, fc.S3Client)
+	if err != nil {
+		fmt.Printf("Error in restoring files: %v", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "restored successfully"})
 }
 
 func (fc *FileController) RenameFile(c *gin.Context) {
@@ -246,7 +279,7 @@ func (fc *FileController) InitiateMultiPartUpload(c *gin.Context) {
 		fmt.Println("response not found")
 	}
 
-	key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName)
+	key := fmt.Sprintf("uploads/%s/%s", uuid.New().String(), req.FileName) // TODO remove filename
 
 	input := &s3.CreateMultipartUploadInput{
 		Bucket:      &fc.Bucket,

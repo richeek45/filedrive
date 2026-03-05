@@ -106,3 +106,14 @@ export const shareFilesApi = async (payload: {
   const res = await api.post("/files/share", payload);
   return res.data;
 };
+
+export const restoreFileApi = async (payload: { fileId: string }) => {
+  const res = await api.post("/files/restore-file", payload);
+  return res.data;
+};
+
+// API call for restoring all deleted files
+export const restoreAllDeletedFilesApi = async () => {
+  const res = await api.post("/files/restore-deleted-files");
+  return res.data;
+};
